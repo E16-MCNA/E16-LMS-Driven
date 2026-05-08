@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ course.title }}</h1>
+<div class="learning-layout">
+  <section class="card">
+    <h2>{{ selected_lesson.title }}</h2>
+    {% if selected_lesson.video_url %}
+      <iframe class="video-frame" src="{{ selected_lesson.video_url }}" allowfullscreen></iframe>
+    {% else %}
+      <p>Bài này chưa có video URL.</p>
+    {% endif %}
+    <p>
+      <a href="{{ selected_lesson.document_url }}" target="_blank">Tài liệu tham khảo</a>
+    </p>
+    <form method="post" action="{{ url_for('student.mark_complete', course_id=course.id, lesson_id=selected_lesson.id) }}">
+      <button type="submit">Mark as Complete</button>
+    </form>
+  </section>
+
+  <aside class="card">
+    <h2>Playlist</h2>
+    {% for lesson in lessons %}
+      <a class="playlist-item" href="{{ url_for('student.learn', course_id=course.id, lesson=lesson.id) }}">
+        <span>#{{ lesson.sequence_order }} {{ lesson.title }}</span>
+        {% if lesson.id in completed_ids %}
+          <span class="status done">đã hoàn thành</span>
+        {% elif lesson.id == selected_lesson.id %}
+          <span class="status learning">đang học</span>
+        {% else %}
+          <span class="status todo">chưa học</span>
+        {% endif %}
+      </a>
+    {% endfor %}
+  </aside>
+</div>
+{% endblock %}

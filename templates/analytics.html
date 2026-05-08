@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Analytics Dashboard (Admin)</h1>
+<p><a class="button" href="{{ url_for('analytics.export_csv') }}">Export Data to CSV</a></p>
+
+{% for item in course_stats %}
+  <section class="card">
+    <h2>{{ item.course.title }}</h2>
+    <div class="metric">Course Completion Rate: {{ "%.2f"|format(item.completion_rate) }}%</div>
+    <canvas id="chart-{{ loop.index }}" height="90"></canvas>
+    <script>
+      new Chart(document.getElementById("chart-{{ loop.index }}"), {
+        type: "bar",
+        data: {
+          labels: {{ item.funnel_labels|tojson }},
+          datasets: [{
+            label: "Số học viên complete",
+            data: {{ item.funnel_values|tojson }},
+            backgroundColor: "rgba(56, 189, 248, 0.5)",
+            borderColor: "rgba(2, 132, 199, 1)",
+            borderWidth: 1
+          }]
+        },
+        options: {
+          plugins: { title: { display: true, text: "Drop-off Funnel – Số học viên hoàn thành mỗi bài" } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    </script>
+  </section>
+{% endfor %}
+{% endblock %}

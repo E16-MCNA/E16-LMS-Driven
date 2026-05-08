@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Student Dashboard</h1>
+
+<section class="card">
+  <h2>Danh sách khóa học</h2>
+  {% for course in available_courses %}
+    <div class="row">
+      <span>{{ course.title }} ({{ course.total_lessons }} lessons)</span>
+      {% if course.id in enrolled_course_ids %}
+        <span class="pill">Đã tham gia</span>
+      {% else %}
+        <form method="post" action="{{ url_for('student.enroll', course_id=course.id) }}">
+          <button type="submit">Enroll</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endfor %}
+</section>
+
+{% if rows|length == 0 %}
+  <div class="card">
+    <p>Bạn chưa enrolled khóa học nào. Hãy nhờ teacher tạo khóa học demo trước.</p>
+  </div>
+{% endif %}
+
+{% for row in rows %}
+  <article class="card">
+    <h2>{{ row.course.title }}</h2>
+    <p>{{ row.course.description }}</p>
+    <div class="progress-wrap">
+      <div class="progress-label">Tiến độ của bạn: {{ "%.1f"|format(row.my_rate) }}% | Trung bình lớp: {{ "%.1f"|format(row.avg_rate) }}%</div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: {{ row.my_rate }}%"></div>
+      </div>
+    </div>
+    <p>Enrollment status: <strong>{{ row.enrollment.status }}</strong></p>
+    <a class="button" href="{{ url_for('student.learn', course_id=row.course.id) }}">Vào học</a>
+  </article>
+{% endfor %}
+{% endblock %}

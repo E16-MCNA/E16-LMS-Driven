@@ -1,0 +1,196 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.container {
+  width: min(1080px, 96%);
+  margin: 0 auto;
+}
+
+.topbar {
+  background: #0f172a;
+  color: white;
+  padding: 10px 0;
+  margin-bottom: 20px;
+}
+
+.topbar-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.brand {
+  color: white;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.nav a {
+  color: #bae6fd;
+  margin-left: 12px;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.auth {
+  max-width: 420px;
+  margin: 24px auto;
+}
+
+.form-grid {
+  display: grid;
+  gap: 10px;
+}
+
+input,
+textarea,
+select,
+button {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 14px;
+}
+
+button,
+.button {
+  background: #0284c7;
+  color: white;
+  border: none;
+  text-decoration: none;
+  cursor: pointer;
+  display: inline-block;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pill {
+  background: #e2e8f0;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.flash-wrap {
+  margin-bottom: 14px;
+}
+
+.flash {
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.flash.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.flash.success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.learning-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+}
+
+.video-frame {
+  width: 100%;
+  min-height: 420px;
+  border: 0;
+  border-radius: 8px;
+}
+
+.playlist-item {
+  display: flex;
+  justify-content: space-between;
+  text-decoration: none;
+  color: inherit;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.status {
+  font-size: 12px;
+}
+
+.status.done {
+  color: #15803d;
+}
+
+.status.learning {
+  color: #0ea5e9;
+}
+
+.status.todo {
+  color: #64748b;
+}
+
+.progress-wrap {
+  margin: 10px 0;
+}
+
+.progress-label {
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.progress-bar {
+  width: 100%;
+  background: #e2e8f0;
+  border-radius: 999px;
+  height: 12px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  background: #22c55e;
+  height: 100%;
+}
+
+.metric {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.lesson-item,
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+@media (max-width: 960px) {
+  .learning-layout {
+    grid-template-columns: 1fr;
+  }
+}

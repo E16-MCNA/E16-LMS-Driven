@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Teacher - Course Management</h1>
+
+<section class="card">
+  <h2>Tạo khóa học</h2>
+  <form method="post" action="{{ url_for('teacher.create_course') }}" class="form-grid">
+    <label>Title</label>
+    <input name="title" required />
+    <label>Description</label>
+    <textarea name="description" rows="3"></textarea>
+    <label>Cover Image URL</label>
+    <input name="cover_image_url" />
+    <button type="submit">Tạo Course</button>
+  </form>
+</section>
+
+{% for course in courses %}
+  <article class="card">
+    <h2>{{ course.title }}</h2>
+    <p>{{ course.description }}</p>
+    <p><strong>Total lessons:</strong> {{ course.total_lessons }}</p>
+    <div class="actions">
+      <a class="button" href="{{ url_for('teacher.manage_lessons', course_id=course.id) }}">Quản lý Lesson</a>
+      <form method="post" action="{{ url_for('teacher.delete_course', course_id=course.id) }}" onsubmit="return confirm('Xóa khóa học này?')">
+        <button type="submit">Xóa Course</button>
+      </form>
+    </div>
+  </article>
+{% endfor %}
+{% endblock %}

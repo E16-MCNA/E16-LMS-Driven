@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Course: {{ course.title }}</h1>
+<p><a href="{{ url_for('teacher.manage_courses') }}">← Quay lại danh sách khóa học</a></p>
+
+<section class="card">
+  <h2>Thêm bài học</h2>
+  <form method="post" action="{{ url_for('teacher.create_lesson', course_id=course.id) }}" class="form-grid">
+    <label>Lesson Title</label>
+    <input name="title" required />
+    <label>Video URL</label>
+    <input name="video_url" placeholder="https://www.youtube.com/embed/..." />
+    <label>Document URL</label>
+    <input name="document_url" placeholder="https://..." />
+    <button type="submit">Thêm Lesson</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Danh sách bài học (sequence_order)</h2>
+  <form method="post" action="{{ url_for('teacher.reorder_lessons', course_id=course.id) }}">
+    {% for lesson in lessons %}
+      <div class="lesson-item">
+        <input type="hidden" name="lesson_ids" value="{{ lesson.id }}" />
+        <div>
+          <strong>#{{ lesson.sequence_order }} - {{ lesson.title }}</strong><br />
+          <small>{{ lesson.video_url }}</small>
+        </div>
+        <div class="actions">
+          <button formaction="{{ url_for('teacher.delete_lesson', course_id=course.id, lesson_id=lesson.id) }}" formmethod="post" onclick="return confirm('Xóa lesson này?')">Xóa</button>
+        </div>
+      </div>
+    {% endfor %}
+    <p><small>Muốn đổi thứ tự: chỉnh trực tiếp thứ tự các input hidden trong HTML hoặc mở rộng drag-drop sau.</small></p>
+  </form>
+</section>
+{% endblock %}
