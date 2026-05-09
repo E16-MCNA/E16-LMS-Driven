@@ -128,6 +128,7 @@ def seed():
         return "Unauthorized: Invalid seed key.", 403
 
     db.drop_all() # Reset for schema update
+    db.create_all()
     if db.session.query(User).count() > 10: # Allow some seeding if few users
         return "Seed skipped: database already has significant data."
     
