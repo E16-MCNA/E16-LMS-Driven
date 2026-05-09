@@ -120,9 +120,14 @@ def reset_password(token):
 @bp.route("/seed")
 def seed():
     import random
-    db.drop_all() # Reset for schema update
-    db.create_all() 
+    
+    # Security: Require key to seed
     seed_password = os.getenv("E16_SEED_PASSWORD", "demo-password")
+    request_key = request.args.get("key")
+    if request_key != seed_password:
+        return "Unauthorized: Invalid seed key.", 403
+
+    db.drop_all() # Reset for schema update
     if db.session.query(User).count() > 10: # Allow some seeding if few users
         return "Seed skipped: database already has significant data."
     

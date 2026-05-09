@@ -10,7 +10,7 @@ if (-not (Test-Path ".env")) {
 
 python -m pip install -r requirements.txt
 
-$env:FLASK_APP = "manage.py"
+$env:FLASK_APP = "app.py"
 flask db upgrade
 
 # Seed chỉ chạy lần đầu, nếu đã có dữ liệu sẽ tự bỏ qua.

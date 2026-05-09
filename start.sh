@@ -1,20 +1,28 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
 
-cd "$(dirname "$0")"
+# E16 LMS Startup Script for Linux/macOS
 
-if [[ ! -f ".env" ]]; then
-  echo "Missing .env. Copy .env.example to .env and update values first."
-  exit 1
+echo "--- Starting E16 LMS Setup ---"
+
+# Check if .env exists
+if [ ! -f .env ]; then
+    echo "Creating .env from .env.example..."
+    cp .env.example .env
 fi
 
-python -m pip install -r requirements.txt
+# Install dependencies
+echo "Installing requirements..."
+pip install -r requirements.txt
 
-export FLASK_APP=manage.py
+# Run migrations
+echo "Running database migrations..."
+export FLASK_APP=app.py
 flask db upgrade
 
-# Seed only on first run; endpoint safely skips if data already exists.
-python -c "from e16_app import create_app; app=create_app(); c=app.test_client(); r=c.get('/seed'); print(r.status_code, r.data.decode())"
+# Run smoke test / verification
+echo "Running verification script..."
+python verify.py
 
-echo "E16 is running at http://127.0.0.1:5000"
+# Start the application
+echo "Starting Flask server..."
 python app.py

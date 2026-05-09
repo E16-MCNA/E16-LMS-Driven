@@ -1,0 +1,53 @@
+name: E16 LMS CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: e16_user
+          POSTGRES_PASSWORD: e16_password
+          POSTGRES_DB: e16_lms
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.12"
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run Linting (optional, simple check)
+      run: |
+        python -m py_compile app.py e16_app/*.py
+        
+    - name: Initialize Database & Run Verification
+      env:
+        DATABASE_URL: postgresql://e16_user:e16_password@localhost:5432/e16_lms
+        SECRET_KEY: ci-test-key
+        E16_SEED_PASSWORD: demo-password
+        FLASK_APP: app.py
+      run: |
+        flask db upgrade
+        python verify.py

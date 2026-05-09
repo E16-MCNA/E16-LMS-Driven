@@ -1,86 +1,57 @@
-# E16 LMS (Data-Driven MVP)
+# E16 LMS (Premium Data-Driven MVP)
 
-Flask-based LMS MVP for E16 MCNA with a data-first design:
-- Auth + role routing (`student`, `teacher`, `admin`)
-- Course/Lesson management
-- Learning flow with event logs (`start`, `complete`)
-- Analytics dashboard + CSV export for DA workflow
+A high-performance, Flask-based Learning Management System designed with a data-first approach for educational analytics.
 
-## Tech Stack
-- Python 3.12+
-- Flask, Flask-SQLAlchemy, Flask-Migrate
-- Flask-Login
-- SQLite (dev default), configurable via `DATABASE_URL`
-- Chart.js (CDN in template) for dashboard chart
+## 🚀 Features
+- **Role-Based Access Control (RBAC):** Distinct workflows for `Students`, `Teachers`, and `Admins`.
+- **Learning Analytics:** Real-time tracking of student progress via `LearningLog`.
+- **Modern UI:** Premium dark-mode interface with glassmorphism and responsive design.
+- **Production Ready:** Dockerized with Gunicorn and PostgreSQL support.
 
-## Quick Start (Windows CMD)
-```bat
-cd /d "c:\path\to\E16"
-copy .env.example .env
-notepad .env
-python -m pip install -r requirements.txt
-set FLASK_APP=manage.py
-flask db upgrade
-python -c "from e16_app import create_app; app=create_app(); c=app.test_client(); print(c.get('/seed').status_code)"
-python app.py
-```
+## 🛠️ Tech Stack
+- **Backend:** Python 3.12+, Flask, Flask-SQLAlchemy, Flask-Migrate
+- **Database:** PostgreSQL (Production), SQLite (Development)
+- **Frontend:** HTML5, Vanilla CSS, Chart.js
+- **DevOps:** Docker, Docker Compose
 
-Open: `http://127.0.0.1:5000`
+## 💻 Installation
 
-## Quick Start Scripts
-- Windows PowerShell: `.\start_e16.ps1`
-- Linux/macOS: `bash ./start.sh`
-
-Both scripts:
-- install dependencies
-- run migrations
-- call `/seed` (safe if data already exists)
-- run server
-
-## Environment Variables
-Copy `.env.example` to `.env` and set values.
-
-Required:
-- `SECRET_KEY`
-- `E16_SEED_PASSWORD` (required for `/seed` and `verify.py`)
-
-Common:
-- `DATABASE_URL` (default: `sqlite:///e16.db`)
-- `FLASK_DEBUG` (`true` or `false`)
-- `PORT` (default `5000`)
-- `E16_SEED_STUDENT_EMAIL`, `E16_SEED_TEACHER_EMAIL`, `E16_SEED_ADMIN_EMAIL`
-
-## Verify PRD/DA Focus
-Run:
+### 1. Environment Setup
+Clone the repository and create your environment file:
 ```bash
-python verify.py
+cp .env.example .env
+# Edit .env with your specific secrets
 ```
 
-`verify.py` asserts:
-- login works and updates `login_count`, `last_login`
-- `start` log is created when entering learning page
-- `complete` log is created on "Mark as Complete"
-- analytics page responds and contains chart script (`new Chart(...)`)
-- CSV export includes required columns:
-  `student_email, course_title, lesson_title, action_type, timestamp`
-
-## Project Structure
+### 2. Run with Docker (Recommended)
+```bash
+docker-compose up --build
 ```
-e16_app/
-  blueprints/
-    auth.py
-    teacher.py
-    student.py
-    analytics.py
-  models.py
-  services.py
-  extensions.py
-migrations/
-templates/
-static/
+The app will be available at `http://localhost:5000`.
+
+### 3. Manual Installation
+**Windows (PowerShell):**
+```powershell
+.\start_e16.ps1
+```
+**Linux/macOS:**
+```bash
+chmod +x start.sh
+./start.sh
 ```
 
-## Security Notes
-- No default seed password is hardcoded in source.
-- Use `.env` for secrets and seed credentials.
-- `.env` and local DB files are ignored by git.
+## 🔒 Security & Deployment
+- **Debug Mode:** Managed via `FLASK_DEBUG` environment variable. Never enable in production.
+- **Database Seeding:** The `/seed` route is protected. Use `http://your-domain.com/seed?key=YOUR_SEED_PASSWORD`.
+- **Database Migrations:** Always use `flask db upgrade` to apply schema changes.
+
+## 📊 Data Analysis (DA) Workflow
+The system exports learning logs in CSV format, optimized for integration with BI tools or Python data science libraries.
+- Columns: `student_email`, `course_title`, `lesson_title`, `action_type`, `timestamp`.
+
+## 🤝 Handover Notes
+To deploy for a client:
+1. Set up a managed PostgreSQL instance.
+2. Configure `DATABASE_URL` and a strong `SECRET_KEY` in the hosting environment.
+3. Map a custom domain with SSL enabled.
+4. Run the seed route once to initialize the platform.

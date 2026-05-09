@@ -15,7 +15,7 @@ COPY . .
 
 # Default port for cloud providers
 ENV PORT=5000
-ENV FLASK_APP=manage.py
+ENV FLASK_APP=app.py
 
 EXPOSE 5000
 
