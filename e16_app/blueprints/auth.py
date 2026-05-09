@@ -127,25 +127,30 @@ def seed():
     if request_key != seed_password:
         return "Unauthorized: Invalid seed key.", 403
 
-    db.drop_all() # Reset for schema update
-    db.create_all()
-    if db.session.query(User).count() > 10: # Allow some seeding if few users
-        return "Seed skipped: database already has significant data."
+    # Safe initialization
+    db.create_all() 
     
-    # Create extra student accounts
+    # Create extra student accounts if they don't exist
     students = []
-    for i in range(1, 11):
+    for i in range(1, 6):
         email = f"student{i}@e16.local"
         if not db.session.query(User).filter(User.email == email).first():
             s = User(email=email, password_hash=generate_password_hash(seed_password), role="student")
             students.append(s)
-    db.session.add_all(students)
-    db.session.commit()
+    if students:
+        db.session.add_all(students)
+        db.session.commit()
 
     # Create roles if missing
-    teacher = User(email="teacher@e16.local", password_hash=generate_password_hash(seed_password), role="teacher")
-    admin = User(email="admin@e16.local", password_hash=generate_password_hash(seed_password), role="admin")
-    db.session.add_all([teacher, admin])
+    teacher = db.session.query(User).filter_by(email="teacher@e16.local").first()
+    if not teacher:
+        teacher = User(email="teacher@e16.local", password_hash=generate_password_hash(seed_password), role="teacher")
+        db.session.add(teacher)
+    
+    admin = db.session.query(User).filter_by(email="admin@e16.local").first()
+    if not admin:
+        admin = User(email="admin@e16.local", password_hash=generate_password_hash(seed_password), role="admin")
+        db.session.add(admin)
     db.session.commit()
 
     # Diverse courses
@@ -172,20 +177,27 @@ def seed():
     all_students = db.session.query(User).filter(User.role == "student").all()
     all_courses = db.session.query(Course).all()
     
-    for s in all_students:
-        # Enroll in random courses
-        for c in random.sample(all_courses, k=random.randint(1, len(all_courses))):
-            exists = db.session.query(Enrollment).filter_by(user_id=s.id, course_id=c.id).first()
-            if not exists:
-                db.session.add(Enrollment(user_id=s.id, course_id=c.id, status="in_progress"))
-                db.session.commit()
-                # Add random logs
-                lessons = db.session.query(Lesson).filter_by(course_id=c.id).all()
-                for l in lessons:
-                    if random.random() > 0.3: # 70% start
-                        db.session.add(LearningLog(user_id=s.id, lesson_id=l.id, action_type="start", timestamp=datetime.utcnow() - timedelta(days=random.randint(0, 7))))
-                    if random.random() > 0.5: # 50% complete
-                        db.session.add(LearningLog(user_id=s.id, lesson_id=l.id, action_type="complete", timestamp=datetime.utcnow() - timedelta(days=random.randint(0, 7))))
-                db.session.commit()
+    if all_students and all_courses:
+        for s in all_students:
+            # Check if student already has some logs, skip if so to avoid over-seeding
+            log_exists = db.session.query(LearningLog).filter_by(user_id=s.id).first()
+            if log_exists:
+                continue
+                
+            # Enroll in random courses
+            k_val = random.randint(1, len(all_courses))
+            for c in random.sample(all_courses, k=k_val):
+                exists = db.session.query(Enrollment).filter_by(user_id=s.id, course_id=c.id).first()
+                if not exists:
+                    db.session.add(Enrollment(user_id=s.id, course_id=c.id, status="in_progress"))
+                    db.session.commit()
+                    # Add random logs
+                    lessons = db.session.query(Lesson).filter_by(course_id=c.id).all()
+                    for l in lessons:
+                        if random.random() > 0.3: # 70% start
+                            db.session.add(LearningLog(user_id=s.id, lesson_id=l.id, action_type="start", timestamp=datetime.utcnow() - timedelta(days=random.randint(0, 7))))
+                        if random.random() > 0.5: # 50% complete
+                            db.session.add(LearningLog(user_id=s.id, lesson_id=l.id, action_type="complete", timestamp=datetime.utcnow() - timedelta(days=random.randint(0, 7))))
+                    db.session.commit()
 
-    return "Seeded rich demo data: 4 new courses, 10 students, and randomized learning logs."
+    return "Seeded rich demo data successfully without resetting existing tables."
