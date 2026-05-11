@@ -82,6 +82,9 @@ def register():
         # Security: chỉ cho phép student hoặc teacher tự đăng ký
         if role not in {"student", "teacher"}:
             role = "student"
+        if len(password) < 8:
+            flash("Mật khẩu phải có ít nhất 8 ký tự.", "error")
+            return redirect(url_for("auth.register"))
         if not email or not password:
             flash("Email và mật khẩu là bắt buộc.", "error")
             return redirect(url_for("auth.register"))
@@ -277,5 +280,3 @@ def seed():
                     db.session.commit()
 
     return "Seeded rich demo data successfully with Categories and enhanced Course info."
-
-    return "Seeded rich demo data successfully without resetting existing tables."

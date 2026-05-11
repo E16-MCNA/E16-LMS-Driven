@@ -42,7 +42,7 @@ make dev
 
 ### 3. Khởi tạo dữ liệu mẫu (Seed)
 1. Đăng nhập với tài khoản Admin mặc định (nếu đã seed qua script) hoặc tạo mới.
-2. Truy cập `/admin/seed` (yêu cầu `FLASK_ENV=development`) để khởi tạo Danh mục và Cấu hình hệ thống.
+2. Truy cập `/auth/seed?key=<E16_SEED_PASSWORD>` để khởi tạo Danh mục, Khóa học mẫu và Dữ liệu demo.
 
 ## 🛠️ Công nghệ sử dụng
 - **Backend**: Flask, SQLAlchemy, Flask-Migrate, Flask-Login.
@@ -51,9 +51,11 @@ make dev
 - **Communication**: Flask-Mail (SMTP), Chart.js (Analytics).
 
 ## 🔑 Tài khoản mặc định (Test Data)
-- **Admin**: `admin@e16.edu.vn` / `admin123` (Cần chạy seed)
-- **Teacher**: `teacher@e16.edu.vn` / `teacher123`
-- **Student**: `student@e16.edu.vn` / `student123`
+- **Admin**: `admin@e16.local` / `<E16_SEED_PASSWORD>`
+- **Teacher**: `teacher@e16.local` / `<E16_SEED_PASSWORD>`
+- **Student**: `student1@e16.local` ~ `student5@e16.local` / `<E16_SEED_PASSWORD>`
+
+> **Lưu ý**: Mật khẩu mặc định là giá trị biến môi trường `E16_SEED_PASSWORD` (mặc định: `demo-password`).
 
 ---
 

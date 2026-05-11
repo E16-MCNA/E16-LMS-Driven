@@ -11,6 +11,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U e16_user -d e16_lms"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   web:
     build: .
@@ -18,10 +23,11 @@ services:
       - "5000:5000"
     environment:
       - DATABASE_URL=postgresql://e16_user:e16_password@db:5432/e16_lms
-      - SECRET_KEY=your-production-secret-key
-      - E16_SEED_PASSWORD=your-seed-password
+      - SECRET_KEY=${SECRET_KEY:?Set SECRET_KEY in .env}
+      - E16_SEED_PASSWORD=${E16_SEED_PASSWORD:-demo-password}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
 volumes:
   postgres_data:

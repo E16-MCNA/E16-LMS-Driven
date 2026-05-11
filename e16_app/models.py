@@ -195,6 +195,7 @@ class QuizAttempt(db.Model):
     score = db.Column(db.Integer)
     passed = db.Column(db.Boolean)
     attempted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime, nullable=True)
 
 
 class QuizAnswer(db.Model):
@@ -230,3 +231,5 @@ class Submission(db.Model):
     status = db.Column(db.String(20), default="pending")  # pending, graded, revision_needed
     score = db.Column(db.Integer)
     feedback = db.Column(db.Text)
+    graded_at = db.Column(db.DateTime, nullable=True)
+    graded_by = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=True)

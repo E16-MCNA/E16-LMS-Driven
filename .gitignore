@@ -4,3 +4,5 @@ instance/*.db
 instance/*.pre_migration_backup
 *.sqlite3
 .env
+.pytest_cache/
+scripts/

@@ -38,7 +38,7 @@ def test_user_registration(client, app):
     
     assert response.status_code == 200
     with app.app_context():
-        user = User.query.filter_by(email="test@e16.edu.vn").first()
+        user = db.session.query(User).filter_by(email="test@e16.edu.vn").first()
         assert user is not None
         assert user.role == "student"
 

@@ -13,7 +13,6 @@ from ..services.logging import logger
 bp = Blueprint("student", __name__)
 
 
-# ... (list_courses and dashboard stay same) ...
 
 @bp.route("/courses")
 @login_required
@@ -90,11 +89,12 @@ def dashboard():
         LearningLog.action_type == "complete"
     ).order_by(LearningLog.timestamp.desc()).limit(5).all()
     
-    # Stats
+    # Stats — calculate actual learning streak (consecutive days with completions)
+    streak = _calc_streak(current_user.id)
     stats = {
         "total_courses": len(enrollments),
         "total_completed_lessons": total_completed_lessons,
-        "streak": 1 
+        "streak": streak
     }
     
     return render_template(
@@ -333,6 +333,31 @@ def view_calendar():
     deadlines.sort(key=lambda x: x["deadline"])
     
     return render_template("calendar.html", deadlines=deadlines)
+
+
+def _calc_streak(user_id):
+    """Calculate consecutive days with at least one lesson completion, counting back from today."""
+    from datetime import date, timedelta as td
+    rows = db.session.query(
+        func.date(LearningLog.timestamp)
+    ).filter(
+        LearningLog.user_id == user_id,
+        LearningLog.action_type == "complete"
+    ).distinct().order_by(func.date(LearningLog.timestamp).desc()).all()
+
+    if not rows:
+        return 0
+
+    dates = sorted({r[0] if isinstance(r[0], date) else datetime.strptime(str(r[0]), "%Y-%m-%d").date() for r in rows}, reverse=True)
+    streak = 0
+    expected = date.today()
+    for d in dates:
+        if d == expected:
+            streak += 1
+            expected -= td(days=1)
+        elif d < expected:
+            break
+    return max(streak, 1) if dates else 0
 
 
 def student_completion_rate(user_id, course_id):
