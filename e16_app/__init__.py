@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from flask import Flask
 from flask_login import current_user
 
-from .extensions import db, login_manager, migrate, oauth, mail, csrf
+from .extensions import db, login_manager, migrate, oauth, mail, csrf, limiter
 
 def create_app():
     load_dotenv()
@@ -36,6 +36,7 @@ def create_app():
     login_manager.init_app(app)
     oauth.init_app(app)
     mail.init_app(app)
+    limiter.init_app(app)
     
     @app.route("/")
     def index():

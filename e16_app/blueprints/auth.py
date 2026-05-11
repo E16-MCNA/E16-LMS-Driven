@@ -6,7 +6,7 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 from flask_login import current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from ..extensions import db, oauth
+from ..extensions import db, oauth, limiter
 from ..models import Course, Enrollment, LearningLog, Lesson, User
 from ..services.course import recalc_total_lessons
 from ..services.logging import logger
@@ -71,6 +71,7 @@ def home():
 
 
 @bp.route("/register", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def register():
     if current_user.is_authenticated:
         return redirect(url_for("auth.home"))
@@ -78,9 +79,9 @@ def register():
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
         role = request.form.get("role", "student")
-        if role not in {"student", "teacher", "admin"}:
-            flash("Role không hợp lệ. Vui lòng chọn lại.", "error")
-            return redirect(url_for("auth.register"))
+        # Security: chỉ cho phép student hoặc teacher tự đăng ký
+        if role not in {"student", "teacher"}:
+            role = "student"
         if not email or not password:
             flash("Email và mật khẩu là bắt buộc.", "error")
             return redirect(url_for("auth.register"))
@@ -97,6 +98,7 @@ def register():
 
 
 @bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("auth.home"))
@@ -125,6 +127,7 @@ def logout():
 
 
 @bp.route("/forgot-password", methods=["GET", "POST"])
+@limiter.limit("3 per minute")
 def forgot_password():
     if current_user.is_authenticated:
         return redirect(url_for("auth.home"))
@@ -136,12 +139,13 @@ def forgot_password():
             user.reset_token = token
             user.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
             db.session.commit()
-            # Simulation: In production, send email here.
             reset_url = url_for("auth.reset_password", token=token, _external=True)
-            print(f"DEBUG: Password reset link for {email}: {reset_url}")
-            flash("Một liên kết đặt lại mật khẩu đã được gửi đến email của bạn (kiểm tra console logs).", "success")
-        else:
-            flash("Email không tồn tại trong hệ thống.", "error")
+            # Security: chỉ log trong chế độ debug, không bao giờ dùng print
+            if current_app.debug:
+                current_app.logger.debug(f"Password reset link for {email}: {reset_url}")
+            # TODO: Gửi email thật trong production bằng Flask-Mail
+        # Security: luôn trả về thông báo chung để chống email enumeration
+        flash("Nếu email tồn tại trong hệ thống, một liên kết đặt lại mật khẩu sẽ được gửi.", "info")
         return redirect(url_for("auth.login"))
     return render_template("forgot_password.html", user=None)
 
