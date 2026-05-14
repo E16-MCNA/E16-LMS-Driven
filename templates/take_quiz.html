@@ -6,25 +6,66 @@
     <h1>Làm bài trắc nghiệm: {{ quiz.title }}</h1>
     <p>Điểm đạt: {{ quiz.pass_score }}% | Lượt làm: {{ quiz.max_attempts }}</p>
   </div>
+  {% if quiz.time_limit and quiz.time_limit > 0 %}
+  <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); padding: 12px 24px; border-radius: 8px; text-align: center; color: var(--danger); font-weight: bold; font-size: 1.2rem;">
+    ⏱ Thời gian còn lại: <span id="timer">{{ quiz.time_limit }}:00</span>
+  </div>
+  {% endif %}
 </header>
 
 <div class="card" style="max-width: 800px; margin: 0 auto;">
-  <form action="{{ url_for('student.take_quiz', course_id=course_id, quiz_id=quiz.id) }}" method="post">
+  <form id="quizForm" action="{{ url_for('student.take_quiz', course_id=course_id, quiz_id=quiz.id) }}" method="post">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {% for q in questions %}
+      <input type="hidden" name="served_questions" value="{{ q.id }}">
       <div style="margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid var(--card-border);">
         <div style="font-weight: 600; font-size: 1.1rem; margin-bottom: 16px;">{{ loop.index }}. {{ q.text }}</div>
         <div style="display: flex; flex-direction: column; gap: 12px;">
-          {% for choice in q.choices %}
-            <label style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--card-border); border-radius: 8px; cursor: pointer;">
-              <input type="radio" name="question_{{ q.id }}" value="{{ choice.id }}" required>
-              <span>{{ choice.text }}</span>
-            </label>
-          {% endfor %}
+          {% if q.q_type == 'mcq' %}
+            {% for choice in q.choices %}
+              <label style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--card-border); border-radius: 8px; cursor: pointer;">
+                <input type="radio" name="question_{{ q.id }}" value="{{ choice.id }}" required>
+                <span>{{ choice.text }}</span>
+              </label>
+            {% endfor %}
+          {% elif q.q_type == 'checkbox' %}
+            {% for choice in q.choices %}
+              <label style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--card-border); border-radius: 8px; cursor: pointer;">
+                <input type="checkbox" name="question_{{ q.id }}" value="{{ choice.id }}">
+                <span>{{ choice.text }}</span>
+              </label>
+            {% endfor %}
+          {% elif q.q_type == 'fill_in_blank' %}
+            <input type="text" name="question_{{ q.id }}" class="form-control" placeholder="Nhập câu trả lời..." required style="padding: 12px; border: 1px solid var(--card-border); border-radius: 8px; font-size: 1rem; width: 100%;">
+          {% endif %}
         </div>
       </div>
     {% endfor %}
-    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 12px;" onclick="return confirm('Bạn có chắc chắn muốn nộp bài?')">Nộp bài làm</button>
+    <button type="submit" id="submitBtn" class="btn btn-primary" style="width: 100%; margin-top: 12px;" onclick="return confirm('Bạn có chắc chắn muốn nộp bài?')">Nộp bài làm</button>
   </form>
 </div>
+
+{% if quiz.time_limit and quiz.time_limit > 0 %}
+<script>
+  let totalSeconds = {{ quiz.time_limit * 60 }};
+  const timerElement = document.getElementById('timer');
+  const quizForm = document.getElementById('quizForm');
+  
+  const timerInterval = setInterval(() => {
+    totalSeconds--;
+    
+    let minutes = Math.floor(totalSeconds / 60);
+    let seconds = totalSeconds % 60;
+    timerElement.innerText = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    
+    if (totalSeconds <= 0) {
+      clearInterval(timerInterval);
+      alert("Hết thời gian làm bài! Hệ thống tự động nộp bài.");
+      // Remove required attributes so form submits even if incomplete
+      quizForm.querySelectorAll('input[type="radio"]').forEach(radio => radio.removeAttribute('required'));
+      quizForm.submit();
+    }
+  }, 1000);
+</script>
+{% endif %}
 {% endblock %}

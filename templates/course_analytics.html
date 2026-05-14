@@ -34,6 +34,13 @@
   </section>
 </div>
 
+<div class="grid-2" style="display: grid; grid-template-columns: 1fr; gap: 32px; margin-top: 32px;">
+  <section class="card">
+    <h2 style="margin-bottom: 24px;">Phổ điểm tổng hợp (Quiz)</h2>
+    <canvas id="scoreDistChart" style="max-height: 350px;"></canvas>
+  </section>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   // Funnel Chart
@@ -92,6 +99,40 @@
         y: { 
           beginAtZero: true, max: 100, 
           ticks: { color: '#94a3b8' },
+          grid: { color: 'rgba(255, 255, 255, 0.1)' }
+        },
+        x: { 
+          ticks: { color: '#94a3b8' },
+          grid: { display: false }
+        }
+      }
+    }
+  });
+
+  // Score Distribution Chart (Phổ điểm)
+  const scoreDistCtx = document.getElementById('scoreDistChart').getContext('2d');
+  const distData = {{ score_distribution | tojson }};
+  new Chart(scoreDistCtx, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(distData),
+      datasets: [{
+        label: 'Số lượng bài thi',
+        data: Object.values(distData),
+        backgroundColor: 'rgba(16, 185, 129, 0.6)',
+        borderColor: 'rgb(16, 185, 129)',
+        borderWidth: 1,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { labels: { color: '#f0f3ff' } }
+      },
+      scales: {
+        y: { 
+          beginAtZero: true, 
+          ticks: { stepSize: 1, color: '#94a3b8' },
           grid: { color: 'rgba(255, 255, 255, 0.1)' }
         },
         x: { 

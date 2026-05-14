@@ -119,6 +119,8 @@ class Quiz(db.Model):
     title = db.Column(db.String(255), nullable=False)
     pass_score = db.Column(db.Integer, default=80)
     max_attempts = db.Column(db.Integer, default=3)
+    time_limit = db.Column(db.Integer, nullable=True)  # Giới hạn thời gian thi (phút)
+    random_question_count = db.Column(db.Integer, default=0) # Ngân hàng câu hỏi: số câu sẽ lấy ngẫu nhiên
     due_date = db.Column(db.DateTime, nullable=True)
     is_published = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=_utcnow)

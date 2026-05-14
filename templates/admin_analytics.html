@@ -16,10 +16,13 @@
   </div>
 </header>
 
-<div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 40px;">
+<div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; margin-bottom: 40px;">
   <div class="card stat-card">
     <div class="stat-value">{{ total_users }}</div>
     <div class="stat-label">Tổng người dùng</div>
+    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 8px;">
+      {{ total_teachers }} Giảng viên &middot; {{ total_students }} Học viên
+    </div>
   </div>
   <div class="card stat-card">
     <div class="stat-value">{{ total_courses }}</div>
@@ -57,7 +60,7 @@
     <div>
       <h2 style="margin-bottom: 16px;">Xuất dữ liệu báo cáo</h2>
       <p style="color: var(--text-muted); margin-bottom: 24px;">Tải toàn bộ số liệu dưới dạng file CSV để xử lý Excel.</p>
-      <button class="btn btn-primary" onclick="alert('Tính năng xuất CSV tổng hợp đang được chuẩn bị!')">Tải xuống báo cáo (.csv)</button>
+      <a href="{{ url_for('analytics.export_csv') }}" class="btn btn-primary">Tải xuống báo cáo (.csv)</a>
     </div>
   </section>
 </div>

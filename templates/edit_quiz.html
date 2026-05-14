@@ -25,6 +25,16 @@
           <label>Số lượt làm bài tối đa</label>
           <input type="number" name="max_attempts" value="{{ quiz.max_attempts if quiz else 3 }}" min="1">
         </div>
+        <div class="form-group">
+          <label>Trộn câu hỏi ngẫu nhiên</label>
+          <input type="number" name="random_question_count" value="{{ quiz.random_question_count if quiz else 0 }}" min="0" placeholder="Số câu cần bốc (0 = tắt)">
+          <small style="color: var(--text-muted);">Nhập 0 để học viên làm toàn bộ câu hỏi. Nhập 20 để bốc ngẫu nhiên 20 câu trong ngân hàng.</small>
+        </div>
+        <div class="form-group">
+          <label>Giới hạn thời gian (Phút)</label>
+          <input type="number" name="time_limit" value="{{ quiz.time_limit if quiz else 15 }}" min="0" placeholder="Nhập 0 nếu không giới hạn">
+          <small style="color: var(--text-muted);">Hết thời gian hệ thống sẽ tự động nộp bài.</small>
+        </div>
         {% if quiz %}
         <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
           <input type="checkbox" name="is_published" id="is_published" {% if quiz.is_published %}checked{% endif %}>
@@ -43,7 +53,11 @@
       
       {% for q in questions %}
         <div style="padding: 16px; border: 1px solid var(--card-border); border-radius: 12px; margin-bottom: 16px;">
-          <div style="font-weight: 600; margin-bottom: 12px;">Câu {{ loop.index }}: {{ q.text }}</div>
+          <div style="font-weight: 600; margin-bottom: 12px;">Câu {{ loop.index }}: {{ q.text }}
+            <span class="badge" style="background: rgba(255,255,255,0.1); font-size: 0.75rem;">
+              {% if q.q_type == 'mcq' %}1 đáp án{% elif q.q_type == 'checkbox' %}Nhiều đáp án{% else %}Điền khuyết{% endif %}
+            </span>
+          </div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
             {% for choice in q.id|get_choices %}
               <div style="padding: 8px; border-radius: 8px; font-size: 0.9rem; background: {% if choice.is_correct %}rgba(34, 197, 94, 0.1){% else %}var(--bg-soft){% endif %}; border: 1px solid {% if choice.is_correct %}var(--success){% else %}var(--card-border){% endif %};">
@@ -63,21 +77,50 @@
             <textarea name="text" rows="2" required></textarea>
           </div>
           <div class="form-group">
-            <label>Lựa chọn (Nhập văn bản và chọn đáp án đúng)</label>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label>Loại câu hỏi</label>
+            <select name="q_type" required onchange="toggleQType(this.value)">
+              <option value="mcq">Trắc nghiệm (1 đáp án)</option>
+              <option value="checkbox">Trắc nghiệm (Nhiều đáp án đúng)</option>
+              <option value="fill_in_blank">Điền vào chỗ trống</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label id="choices_label">Lựa chọn (Đánh dấu vào đáp án ĐÚNG)</label>
+            <div style="display: flex; flex-direction: column; gap: 8px;" id="choices_container">
               {% for i in range(4) %}
-                <div style="display: flex; gap: 8px; align-items: center;">
-                  <input type="radio" name="correct_choice" value="{{ i }}" {% if i == 0 %}checked{% endif %}>
+                <div style="display: flex; gap: 8px; align-items: center;" class="choice-row">
+                  <input type="checkbox" name="correct_choices" value="{{ i }}" class="choice-check">
                   <input type="text" name="choice_text" placeholder="Lựa chọn {{ i+1 }}">
                 </div>
               {% endfor %}
             </div>
+            <small id="fill_hint" style="display: none; color: var(--text-muted); margin-top: 8px;">Nhập các đáp án đúng được chấp nhận (VD: Apple, quả táo). Học viên gõ trúng 1 trong các từ này sẽ được tính điểm.</small>
           </div>
           <button type="submit" class="btn btn-outline" style="width: 100%;">Thêm câu hỏi</button>
         </form>
       </div>
     </div>
   </section>
+  <script>
+    function toggleQType(type) {
+      const checks = document.querySelectorAll('.choice-check');
+      const hint = document.getElementById('fill_hint');
+      const label = document.getElementById('choices_label');
+      
+      if (type === 'fill_in_blank') {
+        checks.forEach(c => c.style.display = 'none');
+        hint.style.display = 'block';
+        label.innerText = "Các đáp án được chấp nhận (Không cần tích chọn)";
+      } else {
+        checks.forEach(c => c.style.display = 'inline-block');
+        hint.style.display = 'none';
+        label.innerText = "Lựa chọn (Đánh dấu vào đáp án ĐÚNG)";
+        if (type === 'mcq') {
+           // For simple UI we keep checkboxes but they should only check one, or just let them check one
+        }
+      }
+    }
+  </script>
   {% endif %}
 </div>
 {% endblock %}

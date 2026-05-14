@@ -4,7 +4,7 @@ from datetime import datetime
 
 class GradingService:
     @staticmethod
-    def grade_quiz_attempt(user_id, quiz_id, answers_data):
+    def grade_quiz_attempt(user_id, quiz_id, answers_data, served_q_ids=None):
         """
         Grades a quiz attempt and saves it to the database.
         answers_data: dict of {question_id: choice_id}
@@ -13,7 +13,10 @@ class GradingService:
         if not quiz:
             return None
             
-        questions = db.session.query(Question).filter_by(quiz_id=quiz_id).all()
+        if served_q_ids:
+            questions = db.session.query(Question).filter(Question.id.in_(served_q_ids)).all()
+        else:
+            questions = db.session.query(Question).filter_by(quiz_id=quiz_id).all()
         total_questions = len(questions)
         correct_count = 0
         
@@ -22,21 +25,44 @@ class GradingService:
         db.session.flush() # Get attempt ID
         
         for q in questions:
-            user_choice_id = answers_data.get(str(q.id))
+            user_answer_list = answers_data.get(f"question_{q.id}", [])
+            if not isinstance(user_answer_list, list):
+                user_answer_list = [user_answer_list]
+                
             is_correct = False
             
-            if user_choice_id:
-                correct_choice = db.session.query(Choice).filter_by(question_id=q.id, is_correct=True).first()
-                if correct_choice and str(correct_choice.id) == str(user_choice_id):
-                    correct_count += 1
-                    is_correct = True
+            if q.q_type == 'mcq':
+                user_choice_id = user_answer_list[0] if user_answer_list else None
+                if user_choice_id:
+                    correct_choice = db.session.query(Choice).filter_by(question_id=q.id, is_correct=True).first()
+                    if correct_choice and str(correct_choice.id) == str(user_choice_id):
+                        is_correct = True
+                        
+                    db.session.add(QuizAnswer(attempt_id=attempt.id, question_id=q.id, choice_id=user_choice_id))
+                    
+            elif q.q_type == 'checkbox':
+                user_choice_ids = user_answer_list
+                correct_choices = db.session.query(Choice).filter_by(question_id=q.id, is_correct=True).all()
+                correct_choice_ids = [str(c.id) for c in correct_choices]
                 
-                answer = QuizAnswer(
-                    attempt_id=attempt.id,
-                    question_id=q.id,
-                    choice_id=user_choice_id
-                )
-                db.session.add(answer)
+                if set(user_choice_ids) == set(correct_choice_ids) and len(user_choice_ids) > 0:
+                    is_correct = True
+                    
+                for cid in user_choice_ids:
+                    db.session.add(QuizAnswer(attempt_id=attempt.id, question_id=q.id, choice_id=cid))
+                    
+            elif q.q_type == 'fill_in_blank':
+                user_text = user_answer_list[0] if user_answer_list else ""
+                user_text = user_text.strip().lower()
+                correct_choices = db.session.query(Choice).filter_by(question_id=q.id).all()
+                
+                for c in correct_choices:
+                    if c.text.strip().lower() == user_text:
+                        is_correct = True
+                        break
+                        
+            if is_correct:
+                correct_count += 1
         
         score = (correct_count / total_questions * 100) if total_questions > 0 else 0
         attempt.score = score

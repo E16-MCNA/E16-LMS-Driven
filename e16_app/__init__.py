@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from flask import Flask, render_template
 from flask_login import current_user
 
-from .extensions import db, login_manager, migrate, oauth, mail, csrf, limiter
+from .extensions import db, login_manager, migrate, oauth, mail, csrf, limiter, talisman
 
 def create_app():
     load_dotenv()
@@ -33,6 +33,37 @@ def create_app():
     )
     mail.init_app(app)
     limiter.init_app(app)
+    
+    # --- Security Headers (Talisman) ---
+    csp = {
+        'default-src': '\'self\'',
+        'script-src': [
+            '\'self\'',
+            'https://cdn.jsdelivr.net',
+            'https://code.jquery.com',
+            'https://cdnjs.cloudflare.com',
+            '\'unsafe-inline\'' # Cần thiết nếu có script trong template, nhưng nên tránh
+        ],
+        'style-src': [
+            '\'self\'',
+            'https://fonts.googleapis.com',
+            'https://cdn.jsdelivr.net',
+            '\'unsafe-inline\''
+        ],
+        'font-src': [
+            '\'self\'',
+            'https://fonts.gstatic.com',
+            'https://cdn.jsdelivr.net'
+        ],
+        'img-src': ['\'self\'', 'data:', 'https:', '*'],
+        'frame-src': ['\'self\'', 'https://www.youtube.com', 'https://player.vimeo.com']
+    }
+    talisman.init_app(
+        app,
+        content_security_policy=csp,
+        force_https=os.getenv("FLASK_ENV") == "production",
+        session_cookie_secure=os.getenv("FLASK_ENV") == "production"
+    )
     
     @app.route("/")
     def index():

@@ -207,7 +207,8 @@ def take_quiz(course_id, quiz_id):
         
     if request.method == "POST":
         from ..services import GradingService
-        attempt = GradingService.grade_quiz_attempt(current_user.id, quiz_id, request.form.to_dict())
+        served_q_ids = request.form.getlist("served_questions")
+        attempt = GradingService.grade_quiz_attempt(current_user.id, quiz_id, request.form.to_dict(flat=False), served_q_ids)
         
         if not attempt:
             flash("Có lỗi xảy ra khi chấm điểm.", "error")
@@ -217,6 +218,11 @@ def take_quiz(course_id, quiz_id):
         return render_template("quiz_result.html", quiz=quiz, attempt=attempt, course_id=course_id)
         
     questions = db.session.query(Question).filter_by(quiz_id=quiz_id).all()
+    if request.method == "GET" and quiz.random_question_count and quiz.random_question_count > 0:
+        import random
+        if quiz.random_question_count <= len(questions):
+            questions = random.sample(questions, quiz.random_question_count)
+            
     return render_template("take_quiz.html", quiz=quiz, questions=questions, course_id=course_id)
 
 

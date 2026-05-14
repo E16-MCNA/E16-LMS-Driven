@@ -269,7 +269,9 @@ def create_quiz(course_id):
             course_id=course_id,
             title=request.form.get("title"),
             pass_score=int(request.form.get("pass_score", 80)),
-            max_attempts=int(request.form.get("max_attempts", 3))
+            max_attempts=int(request.form.get("max_attempts", 3)),
+            time_limit=int(request.form.get("time_limit", 0)),
+            random_question_count=int(request.form.get("random_question_count", 0))
         )
         db.session.add(quiz)
         db.session.commit()
@@ -291,6 +293,8 @@ def edit_quiz(course_id, quiz_id):
         quiz.title = request.form.get("title")
         quiz.pass_score = int(request.form.get("pass_score"))
         quiz.max_attempts = int(request.form.get("max_attempts"))
+        quiz.time_limit = int(request.form.get("time_limit", 0))
+        quiz.random_question_count = int(request.form.get("random_question_count", 0))
         quiz.is_published = 'is_published' in request.form
         db.session.commit()
         flash("Đã cập nhật Quiz.", "success")
@@ -326,11 +330,12 @@ def add_question(quiz_id):
     
     # Add choices
     choices_texts = request.form.getlist("choice_text")
-    correct_idx = int(request.form.get("correct_choice", 0))
+    correct_indices = request.form.getlist("correct_choices")
     
     for i, text in enumerate(choices_texts):
         if text.strip():
-            db.session.add(Choice(question_id=question.id, text=text, is_correct=(i == correct_idx)))
+            is_correct = (str(i) in correct_indices) if q_type != 'fill_in_blank' else True
+            db.session.add(Choice(question_id=question.id, text=text, is_correct=is_correct))
             
     db.session.commit()
 
@@ -574,13 +579,25 @@ def course_analytics(course_id):
         avg = db.session.query(func.avg(QuizAttempt.score)).filter_by(quiz_id=q.id).scalar() or 0
         quiz_stats.append({"title": q.title, "avg": round(float(avg), 1)})
         
+    # Score Distribution (Phổ điểm)
+    score_distribution = {"0-20": 0, "21-40": 0, "41-60": 0, "61-80": 0, "81-100": 0}
+    attempts = db.session.query(QuizAttempt.score).join(Quiz).filter(Quiz.course_id == course_id).all()
+    for (score,) in attempts:
+        if score is None: continue
+        if score <= 20: score_distribution["0-20"] += 1
+        elif score <= 40: score_distribution["21-40"] += 1
+        elif score <= 60: score_distribution["41-60"] += 1
+        elif score <= 80: score_distribution["61-80"] += 1
+        else: score_distribution["81-100"] += 1
+        
     return render_template(
         "course_analytics.html", 
         course=course, 
         enrollment_count=enrollment_count, 
         completed_count=completed_count,
         funnel_data=funnel_data,
-        quiz_stats=quiz_stats
+        quiz_stats=quiz_stats,
+        score_distribution=score_distribution
     )
 
 

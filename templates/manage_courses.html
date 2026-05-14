@@ -34,44 +34,50 @@
     <h2 style="margin-bottom: 24px;">Khóa học của bạn</h2>
     {% if courses %}
       {% for course in courses %}
-        <div class="card" style="display: flex; gap: 20px; align-items: center;">
-          <img src="{{ course.cover_image_url or 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3' }}" alt="" style="width: 80px; height: 80px; border-radius: 12px; object-fit: cover;">
-          <div style="flex: 1;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-              <h3 style="margin: 0;">{{ course.title }}</h3>
-              <span class="badge" style="background: {% if course.status == 'published' %}rgba(34, 197, 94, 0.1); color: var(--success);{% elif course.status == 'pending_review' %}rgba(59, 130, 246, 0.1); color: var(--primary);{% elif course.status == 'rejected' %}rgba(239, 68, 68, 0.1); color: var(--danger);{% else %}rgba(107, 114, 128, 0.1); color: var(--text-muted);{% endif %}">
-                {{ course.status.replace('_', ' ').capitalize() }}
-              </span>
-            </div>
-            <p style="font-size: 0.85rem; margin-bottom: 12px; color: var(--text-muted);">{{ course.total_lessons }} bài học • {{ course.created_at.strftime('%d/%m/%Y') }}</p>
-            
-            {% if course.status == 'rejected' and course.rejection_note %}
-              <div style="background: rgba(239, 68, 68, 0.05); border-left: 3px solid var(--danger); padding: 12px; border-radius: 4px; margin-bottom: 16px; font-size: 0.85rem;">
-                <strong>Lý do từ chối:</strong> {{ course.rejection_note }}
+        <div class="card course-card" style="cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background=''" onclick="document.getElementById('actions-{{ course.id }}').style.display = document.getElementById('actions-{{ course.id }}').style.display === 'none' ? 'flex' : 'none';">
+          <div style="display: flex; gap: 20px; align-items: center;">
+            <img src="{{ course.cover_image_url or 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3' }}" alt="" style="width: 80px; height: 80px; border-radius: 12px; object-fit: cover;">
+            <div style="flex: 1;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                  {{ course.title }}
+                  <span style="font-size: 0.8rem; color: var(--text-muted);">▼</span>
+                </h3>
+                <span class="badge" style="background: {% if course.status == 'published' %}rgba(34, 197, 94, 0.1); color: var(--success);{% elif course.status == 'pending_review' %}rgba(59, 130, 246, 0.1); color: var(--primary);{% elif course.status == 'rejected' %}rgba(239, 68, 68, 0.1); color: var(--danger);{% else %}rgba(107, 114, 128, 0.1); color: var(--text-muted);{% endif %}">
+                  {{ course.status.replace('_', ' ').capitalize() }}
+                </span>
               </div>
-            {% endif %}
-
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <a href="{{ url_for('teacher.manage_lessons', course_id=course.id) }}" class="btn btn-outline btn-sm">Nội dung</a>
-              <a href="{{ url_for('teacher.course_students', course_id=course.id) }}" class="btn btn-outline btn-sm">Học viên</a>
-              <a href="{{ url_for('teacher.manage_quizzes', course_id=course.id) }}" class="btn btn-outline btn-sm">Quizzes</a>
-              <a href="{{ url_for('teacher.manage_assignments', course_id=course.id) }}" class="btn btn-outline btn-sm">Bài tập</a>
-              <a href="{{ url_for('teacher.view_gradebook', course_id=course.id) }}" class="btn btn-outline btn-sm">Sổ điểm</a>
-              <a href="{{ url_for('teacher.course_analytics', course_id=course.id) }}" class="btn btn-outline btn-sm">Analytics</a>
-              <a href="{{ url_for('teacher.edit_course', course_id=course.id) }}" class="btn btn-outline btn-sm">⚙️</a>
+              <p style="font-size: 0.85rem; margin-bottom: 0; color: var(--text-muted);">{{ course.total_lessons }} bài học • {{ course.created_at.strftime('%d/%m/%Y') }}</p>
               
-              {% if course.status in ['draft', 'rejected'] %}
-                <form action="{{ url_for('teacher.submit_course', course_id=course.id) }}" method="post" style="display: inline;">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button type="submit" class="btn btn-primary btn-sm">Gửi duyệt</button>
-                </form>
+              {% if course.status == 'rejected' and course.rejection_note %}
+                <div style="background: rgba(239, 68, 68, 0.05); border-left: 3px solid var(--danger); padding: 12px; border-radius: 4px; margin-top: 12px; font-size: 0.85rem;">
+                  <strong>Lý do từ chối:</strong> {{ course.rejection_note }}
+                </div>
               {% endif %}
-              
-              <form action="{{ url_for('teacher.delete_course', course_id=course.id) }}" method="post" style="display: inline;" onsubmit="return confirm('Xóa toàn bộ khóa học?')">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-danger btn-sm">Xóa</button>
-              </form>
             </div>
+          </div>
+
+          <!-- Hidden Actions Menu -->
+          <div id="actions-{{ course.id }}" style="display: none; gap: 8px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.05);" onclick="event.stopPropagation()">
+            <a href="{{ url_for('teacher.manage_lessons', course_id=course.id) }}" class="btn btn-outline btn-sm">Nội dung</a>
+            <a href="{{ url_for('teacher.course_students', course_id=course.id) }}" class="btn btn-outline btn-sm">Học viên</a>
+            <a href="{{ url_for('teacher.manage_quizzes', course_id=course.id) }}" class="btn btn-outline btn-sm">Quizzes</a>
+            <a href="{{ url_for('teacher.manage_assignments', course_id=course.id) }}" class="btn btn-outline btn-sm">Bài tập</a>
+            <a href="{{ url_for('teacher.view_gradebook', course_id=course.id) }}" class="btn btn-outline btn-sm">Sổ điểm</a>
+            <a href="{{ url_for('teacher.course_analytics', course_id=course.id) }}" class="btn btn-outline btn-sm">Analytics</a>
+            <a href="{{ url_for('teacher.edit_course', course_id=course.id) }}" class="btn btn-outline btn-sm">⚙️</a>
+            
+            {% if course.status in ['draft', 'rejected'] %}
+              <form action="{{ url_for('teacher.submit_course', course_id=course.id) }}" method="post" style="display: inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-primary btn-sm">Gửi duyệt</button>
+              </form>
+            {% endif %}
+            
+            <form action="{{ url_for('teacher.delete_course', course_id=course.id) }}" method="post" style="display: inline;" onsubmit="return confirm('Xóa toàn bộ khóa học?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-danger btn-sm">Xóa</button>
+            </form>
           </div>
         </div>
       {% endfor %}
