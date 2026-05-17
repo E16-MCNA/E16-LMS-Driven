@@ -322,14 +322,20 @@ def seed_system():
     # Seed Users
     from werkzeug.security import generate_password_hash
     users = [
-        {"email": "admin@gmail.com", "password_hash": generate_password_hash("admine16"), "role": "admin"},
-        {"email": "teacher@gmail.com", "password_hash": generate_password_hash("teachere16"), "role": "teacher"},
-        {"email": "student@gmail.com", "password_hash": generate_password_hash("studente16"), "role": "student"}
+        {"email": "admin@e16.local", "password_hash": generate_password_hash("admine16"), "role": "admin"},
+        {"email": "teacher@e16.local", "password_hash": generate_password_hash("teachere16"), "role": "teacher"},
+        {"email": "student@e16.local", "password_hash": generate_password_hash("studente16"), "role": "student"}
     ]
     for u_data in users:
         if not db.session.query(User).filter_by(email=u_data["email"]).first():
             db.session.add(User(**u_data))
             
+    seed_password = os.getenv("E16_SEED_PASSWORD", "demo-password")
+    for i in range(1, 6):
+        email = f"student{i}@e16.local"
+        if not db.session.query(User).filter_by(email=email).first():
+            db.session.add(User(email=email, password_hash=generate_password_hash(seed_password), role="student"))
+
     db.session.commit()
     flush_settings_cache()
     flash("Đã khởi tạo dữ liệu mẫu hệ thống thành công.", "success")

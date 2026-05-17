@@ -99,6 +99,10 @@ def register():
         if len(password) < 8:
             flash("Mật khẩu phải có ít nhất 8 ký tự.", "error")
             return redirect(url_for("auth.register"))
+        confirm_password = request.form.get("confirm_password", "")
+        if password != confirm_password:
+            flash("Mật khẩu và xác nhận mật khẩu không khớp.", "error")
+            return redirect(url_for("auth.register"))
         if not email or not password:
             flash("Email và mật khẩu là bắt buộc.", "error")
             return redirect(url_for("auth.register"))
@@ -237,9 +241,9 @@ def _run_seed(seed_password):
 
     # 1. Create Core Test Users (User Request)
     core_users = [
-        ("admin@gmail.com", "admine16", "admin"),
-        ("teacher@gmail.com", "teachere16", "teacher"),
-        ("student@gmail.com", "studente16", "student")
+        ("admin@e16.local", "admine16", "admin"),
+        ("teacher@e16.local", "teachere16", "teacher"),
+        ("student@e16.local", "studente16", "student")
     ]
     
     teacher = None
@@ -256,7 +260,7 @@ def _run_seed(seed_password):
             teacher = u
 
     # 2. Extra students for variety
-    for i in range(1, 4):
+    for i in range(1, 6):
         email = f"student{i}@e16.local"
         if not db.session.query(User).filter_by(email=email).first():
             db.session.add(User(email=email, password_hash=generate_password_hash(seed_password), role="student"))
