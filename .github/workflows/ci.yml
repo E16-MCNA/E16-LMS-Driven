@@ -1,4 +1,4 @@
-name: E16 LMS CI
+name: E16 LMS CI & Supply-Chain Security
 
 on:
   push:
@@ -6,8 +6,13 @@ on:
   pull_request:
     branches: [ main, master ]
 
+permissions:
+  contents: read
+  id-token: write  # Required for keyless image signing via Cosign
+
 jobs:
   test:
+    name: Code Quality & Testing
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -26,9 +31,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
+    - name: Run Software Composition Analysis (SCA)
+      run: |
+        pip install pip-audit
+        pip-audit -r requirements.txt --desc on
+        
     - name: Verify Application Load
       env:
-        FLASK_ENV: development
+        APP_ENV: development
         SECRET_KEY: ci-test-key
         DATABASE_URL: sqlite:///test.db
       run: |
@@ -36,8 +46,54 @@ jobs:
         
     - name: Run Tests
       env:
-        FLASK_ENV: development
+        APP_ENV: development
         SECRET_KEY: ci-test-key
         DATABASE_URL: sqlite:///test.db
       run: |
         pytest
+
+  security:
+    name: Container Security & Supply-Chain
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Build local container image
+      run: |
+        docker build -t e16-lms:latest .
+
+    - name: Run Trivy Vulnerability Scanner (Image Scan)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'e16-lms:latest'
+        format: 'table'
+        exit-code: '0'  # In real enterprise pipeline, set to 1 on HIGH/CRITICAL CVEs
+        ignore-unfixed: true
+        vuln-type: 'os,library'
+        severity: 'CRITICAL,HIGH'
+
+    - name: Generate Software Bill of Materials (SBOM)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'e16-lms:latest'
+        format: 'cyclonedx'
+        output: 'sbom.json'
+
+    - name: Upload SBOM Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: sbom-cyclonedx
+        path: sbom.json
+
+    - name: Install Cosign (Image Signing)
+      uses: sigstore/cosign-installer@v3.1.1
+
+    - name: Verify Cosign Installation
+      run: |
+        cosign version
+        # Note: In a live registry environment, you would log in and run:
+        # cosign sign --yes e16-lms:latest (utilizing the OIDC token for keyless signing)

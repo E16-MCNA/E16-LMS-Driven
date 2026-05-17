@@ -80,6 +80,7 @@ def create_app():
     talisman.init_app(
         app,
         content_security_policy=csp,
+        content_security_policy_nonce_in=['script-src', 'style-src'],
         force_https=(app_env == "production"),
         session_cookie_secure=(app_env == "production")
     )
