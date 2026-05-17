@@ -9,13 +9,25 @@ def create_app():
     load_dotenv()
     app = Flask(__name__, template_folder="../templates", static_folder="../static")
     
-    flask_env = os.getenv("FLASK_ENV", "production")
+    # Use APP_ENV instead of deprecated FLASK_ENV for environment configuration mapping
+    app_env = os.getenv("APP_ENV", os.getenv("FLASK_ENV", "production")).lower()
     if app.config.get("TESTING"):
-        flask_env = "testing"
+        app_env = "testing"
         
     from .config import config_dict
-    app_config = config_dict.get(flask_env, config_dict["default"])
+    app_config = config_dict.get(app_env, config_dict["default"])
     app.config.from_object(app_config)
+    
+    # Fail-fast security check: SECRET_KEY must be set in non-development environments
+    secret_key = app.config.get("SECRET_KEY")
+    if app_env != "development" and (not secret_key or secret_key == "dev-change-me"):
+        if app_env == "testing":
+            app.config["SECRET_KEY"] = "testing-fallback-key-for-ci"
+        else:
+            raise RuntimeError(
+                f"Security Risk: SECRET_KEY is missing or insecure ('{secret_key}') in non-development environment '{app_env}'!"
+            )
+            
     app_config.init_app(app)
 
     # --- Initialize extensions ---
@@ -55,14 +67,21 @@ def create_app():
             'https://fonts.gstatic.com',
             'https://cdn.jsdelivr.net'
         ],
-        'img-src': ['\'self\'', 'data:', 'https:', '*'],
+        'img-src': [
+            '\'self\'',
+            'data:',
+            'https://images.unsplash.com',
+            'https://*.unsplash.com',
+            'https://cdn.jsdelivr.net',
+            'https://res.cloudinary.com'
+        ],
         'frame-src': ['\'self\'', 'https://www.youtube.com', 'https://player.vimeo.com']
     }
     talisman.init_app(
         app,
         content_security_policy=csp,
-        force_https=os.getenv("FLASK_ENV") == "production",
-        session_cookie_secure=os.getenv("FLASK_ENV") == "production"
+        force_https=(app_env == "production"),
+        session_cookie_secure=(app_env == "production")
     )
     
     @app.route("/")
@@ -115,6 +134,65 @@ def create_app():
             from .models import Notification
             data["unread_notifs_count"] = db.session.query(Notification).filter_by(user_id=current_user.id, is_read=False).count()
         return data
+
+    # --- Structured JSON Logging & Request ID correlation ---
+    import logging
+    import json
+    import uuid
+    from flask import g, jsonify
+
+    class JSONFormatter(logging.Formatter):
+        def format(self, record):
+            log_data = {
+                "timestamp": self.formatTime(record, self.datefmt),
+                "level": record.levelname,
+                "message": record.getMessage(),
+                "module": record.module,
+                "function": record.funcName,
+                "line": record.lineno
+            }
+            try:
+                from flask import has_request_context
+                if has_request_context() and hasattr(g, "request_id"):
+                    log_data["request_id"] = g.request_id
+            except Exception:
+                pass
+            return json.dumps(log_data)
+
+    if app_env == "production":
+        # Configure app logger to output structured JSON in production for ELK/Cloud logging integration
+        from logging import StreamHandler
+        handler = StreamHandler()
+        handler.setFormatter(JSONFormatter())
+        app.logger.handlers = [handler]
+        app.logger.setLevel(logging.INFO)
+
+    @app.before_request
+    def add_request_id():
+        g.request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+
+    @app.after_request
+    def append_request_id_header(response):
+        if hasattr(g, "request_id"):
+            response.headers["X-Request-ID"] = g.request_id
+        return response
+
+    # --- Health Check Endpoints (/healthz, /readyz) ---
+    @app.route("/healthz")
+    def healthz():
+        """Liveness check: simple heartbeat return."""
+        return jsonify({"status": "healthy", "timestamp": datetime.utcnow().isoformat()}), 200
+
+    @app.route("/readyz")
+    def readyz():
+        """Readiness check: check backend database connectivity."""
+        try:
+            from sqlalchemy import text
+            db.session.execute(text("SELECT 1"))
+            return jsonify({"status": "ready", "database": "connected"}), 200
+        except Exception as e:
+            app.logger.error(f"Readiness check failed: {str(e)}")
+            return jsonify({"status": "unready", "database": "disconnected", "error": str(e)}), 503
 
     # --- CLI commands ---
     _register_cli(app)

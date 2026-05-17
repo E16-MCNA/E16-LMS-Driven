@@ -1,4 +1,4 @@
-.PHONY: install dev migrate seed test clean
+.PHONY: install dev migrate seed test test-unit test-integration test-smoke clean
 
 install:
 	pip install -r requirements.txt
@@ -16,6 +16,15 @@ seed:
 
 test:
 	pytest
+
+test-unit:
+	pytest -m "smoke or auth or unit"
+
+test-integration:
+	pytest -m "integration"
+
+test-smoke:
+	python scripts/verify.py
 
 clean:
 	rm -rf __pycache__ .pytest_cache

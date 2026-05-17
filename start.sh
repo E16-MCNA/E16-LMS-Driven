@@ -21,7 +21,7 @@ flask db upgrade
 
 # Run smoke test / verification
 echo "Running verification script..."
-python verify.py
+python scripts/verify.py
 
 # Start the application
 echo "Starting Flask server..."

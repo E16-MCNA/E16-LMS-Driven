@@ -1,0 +1,23 @@
+# Top-level dependencies for E16 LMS
+# Run 'pip-compile requirements.in' to generate/update locked requirements.txt
+
+Flask
+Flask-SQLAlchemy
+Flask-Login
+Flask-Migrate
+Flask-Mail
+SQLAlchemy
+Werkzeug
+flask-wtf
+python-dotenv
+authlib
+requests
+python-slugify
+psycopg2-binary
+gunicorn
+pytest
+supabase
+websockets
+Flask-Limiter
+boto3
+flask-talisman

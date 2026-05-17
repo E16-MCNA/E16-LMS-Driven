@@ -93,8 +93,8 @@ class Enrollment(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=new_uuid)
     user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=False, index=True)
     course_id = db.Column(db.String(36), db.ForeignKey("courses.id"), nullable=False, index=True)
-    enrolled_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
-    status = db.Column(db.String(20), default="active", nullable=False)  # active, dropped, completed
+    enrolled_at = db.Column(db.DateTime, default=_utcnow, nullable=False, index=True)
+    status = db.Column(db.String(20), default="active", nullable=False, index=True)  # active, dropped, completed
 
     # ORM relationships for joinedload
     course = db.relationship("Course", lazy="select")
@@ -106,8 +106,8 @@ class LearningLog(db.Model):
     log_id = db.Column(db.String(36), primary_key=True, default=new_uuid)
     user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=False, index=True)
     lesson_id = db.Column(db.String(36), db.ForeignKey("lessons.id"), nullable=False, index=True)
-    action_type = db.Column(db.String(20), nullable=False)
-    timestamp = db.Column(db.DateTime, default=_utcnow, nullable=False)
+    action_type = db.Column(db.String(20), nullable=False, index=True)
+    timestamp = db.Column(db.DateTime, default=_utcnow, nullable=False, index=True)
 
 
 # --- Quiz System Models ---
@@ -201,9 +201,9 @@ class QuizAttempt(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=new_uuid)
     quiz_id = db.Column(db.String(36), db.ForeignKey("quizzes.id"), nullable=False, index=True)
     user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=False, index=True)
-    score = db.Column(db.Integer)
-    passed = db.Column(db.Boolean)
-    attempted_at = db.Column(db.DateTime, default=_utcnow)
+    score = db.Column(db.Integer, index=True)
+    passed = db.Column(db.Boolean, index=True)
+    attempted_at = db.Column(db.DateTime, default=_utcnow, index=True)
     completed_at = db.Column(db.DateTime, nullable=True)
 
 

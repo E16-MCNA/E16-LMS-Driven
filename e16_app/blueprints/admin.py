@@ -293,7 +293,8 @@ def seed_system():
             return redirect(url_for("auth.login"))
 
     # Security: Only allow seeding in development
-    if os.getenv("FLASK_ENV") != "development":
+    app_env = os.getenv("APP_ENV", os.getenv("FLASK_ENV", "production")).lower()
+    if app_env != "development":
         flash("Tính năng khởi tạo dữ liệu chỉ khả dụng trong môi trường Development.", "error")
         return "Forbidden: This action is only allowed in development environment.", 403
         
