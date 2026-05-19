@@ -38,7 +38,7 @@
                 <div style="background: var(--bg-soft); padding: 16px; border-radius: 8px; font-size: 0.9rem; white-space: pre-wrap; margin-bottom: 12px;">{{ sub.text_content }}</div>
               {% endif %}
               {% if sub.file_path %}
-                <a href="{{ url_for('static', filename=sub.file_path) }}" class="btn btn-outline btn-sm" target="_blank">📄 Tải xuống file bài làm</a>
+                <a href="{{ url_for('teacher.download_submission_file', submission_id=sub.id) }}" class="btn btn-outline btn-sm" target="_blank">📄 Tải xuống file bài làm</a>
               {% endif %}
             </div>
 

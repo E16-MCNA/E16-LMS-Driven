@@ -1,7 +1,8 @@
+# -*- coding: utf-8 -*-
 import csv
 import io
 import os
-from flask import Blueprint, flash, redirect, render_template, request, url_for, make_response, jsonify
+from flask import Blueprint, flash, redirect, render_template, request, url_for, make_response, jsonify, abort
 from flask_login import current_user
 from sqlalchemy import func
 
@@ -10,6 +11,7 @@ from ..extensions import db
 from ..models import Course, Enrollment, Lesson, Quiz, Question, Choice, Assignment, Submission, User, QuizAttempt
 from ..pagination import get_pagination, paginate_query
 from ..services.audit import log_action
+from ..services.course import recalc_total_lessons
 from ..time_utils import parse_datetime_utc, utcnow
 
 bp = Blueprint("teacher", __name__, url_prefix="/teacher")
@@ -17,6 +19,13 @@ bp = Blueprint("teacher", __name__, url_prefix="/teacher")
 
 def _export_max_rows() -> int:
     return max(1, int(os.getenv("EXPORT_MAX_ROWS", "50000")))
+
+
+def _safe_int(val, default=0):
+    try:
+        return int(val) if val is not None and str(val).strip() != "" else default
+    except (ValueError, TypeError):
+        return default
 
 
 @bp.route("/dashboard")
@@ -95,7 +104,7 @@ def edit_course(course_id):
 def submit_course(course_id):
     course = db.session.get(Course, course_id)
     if not course or course.teacher_id != current_user.id or course.is_deleted:
-        return "Unauthorized", 403
+        abort(403)
     
     # Validation: Ensure course has at least one lesson
     from ..models import Lesson
@@ -205,7 +214,7 @@ def create_lesson(course_id):
 def reorder_lessons(course_id):
     course = db.session.get(Course, course_id)
     if not course or course.teacher_id != current_user.id or course.is_deleted:
-        return "Unauthorized", 403
+        abort(403)
         
     lesson_ids = request.form.getlist("lesson_ids[]")
     for index, l_id in enumerate(lesson_ids):
@@ -276,10 +285,10 @@ def create_quiz(course_id):
         quiz = Quiz(
             course_id=course_id,
             title=request.form.get("title"),
-            pass_score=int(request.form.get("pass_score", 80)),
-            max_attempts=int(request.form.get("max_attempts", 3)),
-            time_limit=int(request.form.get("time_limit", 0)),
-            random_question_count=int(request.form.get("random_question_count", 0))
+            pass_score=_safe_int(request.form.get("pass_score"), 80),
+            max_attempts=_safe_int(request.form.get("max_attempts"), 3),
+            time_limit=_safe_int(request.form.get("time_limit"), 0),
+            random_question_count=_safe_int(request.form.get("random_question_count"), 0)
         )
         db.session.add(quiz)
         db.session.commit()
@@ -299,10 +308,10 @@ def edit_quiz(course_id, quiz_id):
         
     if request.method == "POST":
         quiz.title = request.form.get("title")
-        quiz.pass_score = int(request.form.get("pass_score"))
-        quiz.max_attempts = int(request.form.get("max_attempts"))
-        quiz.time_limit = int(request.form.get("time_limit", 0))
-        quiz.random_question_count = int(request.form.get("random_question_count", 0))
+        quiz.pass_score = _safe_int(request.form.get("pass_score"), 80)
+        quiz.max_attempts = _safe_int(request.form.get("max_attempts"), 3)
+        quiz.time_limit = _safe_int(request.form.get("time_limit"), 0)
+        quiz.random_question_count = _safe_int(request.form.get("random_question_count"), 0)
         quiz.is_published = 'is_published' in request.form
         db.session.commit()
         flash("Đã cập nhật Quiz.", "success")
@@ -452,9 +461,23 @@ def grade_submission(submission_id):
     from ..services import GradingService
     GradingService.grade_assignment_submission(submission_id, score, feedback, current_user.id)
 
+    # Audit log for grade changes
+    from ..services.audit import log_action
+    log_action(
+        "grade_submission",
+        target_type="Submission",
+        target_id=str(submission_id),
+        detail={
+            "assignment_id": str(assignment.id),
+            "assignment_title": assignment.title,
+            "student_id": str(sub.user_id),
+            "score": score,
+        },
+    )
+
     # Notify student
     from ..services.notifications import notify
-    notify(sub.user_id, "graded", f"Bài tập '{assignment.title}' của bạn đã được chấm điểm: {sub.score}/100", url_for("student.submit_assignment", course_id=course.id, assignment_id=assignment.id))
+    notify(sub.user_id, "graded", f"Bài tập '{assignment.title}' của bạn đã được chấm điểm: {score}/100", url_for("student.submit_assignment", course_id=course.id, assignment_id=assignment.id))
 
     flash(f"Đã chấm điểm cho học viên.", "success")
     return redirect(url_for("teacher.view_submissions", assignment_id=assignment.id))
@@ -531,7 +554,8 @@ def export_gradebook(course_id):
     course = db.session.get(Course, course_id)
     if not course or course.teacher_id != current_user.id or course.is_deleted: return redirect(url_for("teacher.manage_courses"))
     
-    students = db.session.query(User).join(Enrollment, Enrollment.user_id == User.id).filter(Enrollment.course_id == course_id).all()
+    max_rows = _export_max_rows()
+    students = db.session.query(User).join(Enrollment, Enrollment.user_id == User.id).filter(Enrollment.course_id == course_id).limit(max_rows).all()
     quizzes = db.session.query(Quiz).filter_by(course_id=course_id, is_published=True).all()
     assignments = db.session.query(Assignment).filter_by(course_id=course_id).all()
     
@@ -628,9 +652,32 @@ def course_analytics(course_id):
     )
 
 
-def recalc_total_lessons(course_id):
-    count = db.session.query(Lesson).filter_by(course_id=course_id).count()
-    course = db.session.get(Course, course_id)
-    if course:
-        course.total_lessons = count
-        db.session.commit()
+# recalc_total_lessons is now imported from services.course (line 14)
+
+
+@bp.route("/submissions/<submission_id>/download")
+@login_required
+@role_required("teacher")
+def download_submission_file(submission_id):
+    """Secure file download — verifies teacher ownership before serving file."""
+    sub = db.session.get(Submission, submission_id)
+    if not sub or not sub.file_path:
+        flash("File không tồn tại.", "error")
+        return redirect(url_for("teacher.manage_courses"))
+    
+    assignment = db.session.get(Assignment, sub.assignment_id)
+    if not assignment:
+        flash("Bài tập không tồn tại.", "error")
+        return redirect(url_for("teacher.manage_courses"))
+    
+    course = db.session.get(Course, assignment.course_id)
+    if not course or course.teacher_id != current_user.id or course.is_deleted:
+        flash("Bạn không có quyền tải file này.", "error")
+        return redirect(url_for("teacher.manage_courses"))
+    
+    from ..services.storage import storage
+    try:
+        return storage.send_file_response(sub.file_path)
+    except NotImplementedError:
+        # S3 backend — redirect to presigned URL
+        return redirect(storage.secure_get_url(sub.file_path))

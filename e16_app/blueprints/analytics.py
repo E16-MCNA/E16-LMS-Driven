@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from datetime import timedelta
 import os
 from flask import Blueprint, render_template, request, jsonify

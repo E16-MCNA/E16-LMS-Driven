@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify
 from flask_login import current_user
 from sqlalchemy import func
@@ -21,7 +22,8 @@ def _can_access_course(course):
         return True
     if current_user.role == "teacher" and course.teacher_id == current_user.id:
         return True
-    return db.session.query(Enrollment).filter_by(user_id=current_user.id, course_id=course.id).first() is not None
+    enrollment = db.session.query(Enrollment).filter_by(user_id=current_user.id, course_id=course.id).first()
+    return enrollment is not None and enrollment.status in ("active", "completed")
 
 # --- Notifications ---
 

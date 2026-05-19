@@ -1,100 +1,185 @@
-# E16 LMS - Premium Learning Management System
+# E16 LMS
 
-E16 LMS là một nền tảng quản lý học tập hiện đại, được thiết kế với trải nghiệm người dùng cao cấp (Premium UI/UX) và các tính năng vận hành mạnh mẽ dành cho doanh nghiệp và trường học.
+E16 LMS là ứng dụng quản lý học tập viết bằng Flask. Repo hiện có các luồng chính cho Admin, Teacher và Student: xác thực, quản lý khóa học, duyệt khóa học, học bài, quiz, assignment, gradebook, transcript, certificate, notification, forum, analytics, import/export CSV, Docker và migration database.
 
-![Dashboard Preview](https://images.unsplash.com/photo-1501504905252-473c47e087f8?q=80&w=1974&auto=format&fit=crop)
+Tài liệu phân tích production chi tiết hơn nằm ở [docs/BRD_PRODUCTION.md](docs/BRD_PRODUCTION.md).
 
-## ✨ Tính năng nổi bật
+## Stack hiện tại
 
-- **Premium Interface**: Giao diện Glassmorphism hiện đại, hỗ trợ Dark/Light mode linh hoạt.
-- **Role-based Access**: Phân quyền chi tiết cho Admin, Teacher và Student.
-- **Interactive Learning**: Bài học Video/Document, Quiz trắc nghiệm, Nộp bài tập (Assignment).
-- **Academic Records**: Sổ điểm (Gradebook), Học bạ điện tử (Transcript), Chứng chỉ hoàn thành tự động.
-- **Communication**: Diễn đàn thảo luận (Forum), Thông báo (Notification), Email Alert.
-- **Admin Tools**: Phân tích dữ liệu (Analytics), Import người dùng hàng loạt, Nhật ký hệ thống (Audit Log).
+- Backend: Flask, Flask-SQLAlchemy, Flask-Migrate, Flask-Login, Flask-WTF CSRF, Flask-Limiter, Flask-Talisman.
+- Frontend: Jinja templates, static CSS, vanilla JavaScript, Chart.js.
+- Database: SQLite cho local/test, PostgreSQL cho production.
+- Storage: local `static/uploads` hoặc S3-compatible backend.
+- Email/OAuth: Flask-Mail SMTP, Google OAuth qua Authlib.
+- Deploy: Dockerfile, docker-compose với web, PostgreSQL và Redis.
+- Tests: pytest cho auth, admin, course, grading, communication và storage.
 
-## 🚀 Cài đặt nhanh (Onboarding)
+## Cấu trúc repo
 
-### 1. Chuẩn bị môi trường
-Yêu cầu Python 3.11+.
+```text
+e16_app/
+  blueprints/       Routes theo domain: auth, admin, teacher, student, analytics, communication
+  services/         Business helpers: audit, course, grading, storage, mail, settings, notifications
+  models.py         SQLAlchemy domain models
+  config.py         Config theo APP_ENV
+templates/          Jinja templates
+static/             CSS và uploads local
+migrations/         Alembic migrations
+tests/              Test suite pytest
+docs/               Tài liệu sản phẩm/production readiness
+scripts/            Script kiểm tra, export, vận hành phụ trợ
+```
+
+## Chạy local
+
+Yêu cầu khuyến nghị: Python 3.11 hoặc 3.12.
 
 ```bash
-# Clone repository
-git clone https://github.com/nssiwi19/E16-LMS-Driven.git
-cd E16-LMS-Driven
-
-# Cấu hình biến môi trường
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 cp .env.example .env
-# Chỉnh sửa .env với các thông số của bạn (SECRET_KEY, MAIL, GOOGLE_OAUTH...)
+flask db upgrade
+flask run --debug
 ```
 
-### 2. Cài đặt tự động với Makefile
+Trên Windows PowerShell:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item .env.example .env
+flask db upgrade
+flask run --debug
+```
+
+Seed dữ liệu demo chỉ nên chạy trong development:
+
 ```bash
-# Cài đặt thư viện
-make install
-
-# Khởi tạo Database (SQLite mặc định)
-make migrate
-
-# Chạy ứng dụng Development
-make dev
+flask seed
 ```
 
-### 3. Khởi tạo dữ liệu mẫu (Seed)
-1. Đăng nhập với tài khoản Admin mặc định (nếu đã seed qua script) hoặc tạo mới.
-2. Truy cập `/admin/seed` để khởi tạo Danh mục, Khóa học mẫu và Dữ liệu demo hệ thống (hoặc dùng CLI lệnh `flask seed`).
+Hoặc đăng nhập Admin và vào `/admin/seed` khi `APP_ENV=development`.
 
-## 🛠️ Công nghệ sử dụng
-- **Backend**: Flask, SQLAlchemy, Flask-Migrate, Flask-Login.
-- **Frontend**: Vanilla HTML/CSS/JS (Modern CSS Grid & Flexbox).
-- **Database**: SQLite (Dev) / PostgreSQL (Prod).
-- **Communication**: Flask-Mail (SMTP), Chart.js (Analytics).
+## Chạy bằng Docker
 
-## 🔑 Tài khoản mặc định (Core & Demo Seed Users)
-Hệ thống hỗ trợ các tài khoản mặc định sau sau khi chạy seed hệ thống:
+```bash
+cp .env.example .env
+# Cập nhật SECRET_KEY, POSTGRES_PASSWORD và các biến cần thiết trong .env
+docker compose up --build
+```
 
-| Vai trò | Email | Mật khẩu mặc định | Ghi chú |
-| :--- | :--- | :--- | :--- |
-| **Admin** | `admin@e16.local` | `admine16` | Tài khoản quản trị tối cao |
-| **Teacher** | `teacher@e16.local` | `teachere16` | Giáo viên quản lý khóa học/bài tập |
-| **Student** | `student@e16.local` | `studente16` | Học viên cốt lõi |
-| **Student 1-5** | `student1@e16.local` ~ `student5@e16.local` | `<E16_SEED_PASSWORD>` (Mặc định: `demo-password`) | Nhóm học viên bổ trợ chạy thử nghiệm |
+Docker Compose chạy:
 
----
+- `web`: Flask/Gunicorn app.
+- `db`: PostgreSQL 15.
+- `redis`: rate-limit storage.
 
-## 📊 Bảng so sánh Script Seed Dữ liệu mẫu
+## Tài khoản demo
 
-Hệ thống có nhiều script seed khác nhau phục vụ các kịch bản kiểm thử hiệu năng và giao diện riêng biệt:
+Sau khi seed:
 
-| Script / Lệnh | Dữ liệu khởi tạo | Danh sách người dùng tạo ra | Mật khẩu mặc định | Mục đích sử dụng |
-| :--- | :--- | :--- | :--- | :--- |
-| **`flask seed`** hoặc **`/admin/seed`** | Danh mục, 4 khóa học mẫu, lessons, enrollments, logs cơ bản | `admin@e16.local`, `teacher@e16.local`, `student@e16.local`, `student1@e16.local` ~ `student5@e16.local` | `admine16` (Admin), `teachere16` (Teacher), `studente16` (Student), `demo-password` (Student 1-5) | Khởi tạo onboarding nhanh và cơ bản để trải nghiệm giao diện. |
-| **`seed_100.py`** | 1 khóa học mẫu, 10 bài học, 100 học viên, logs học tập ngẫu nhiên | `teacher_demo@e16.edu.vn` và `student_demo_1@e16.edu.vn` ~ `student_demo_100@e16.edu.vn` | `123456` | Thử nghiệm hiển thị phân trang và hiệu suất mức trung bình. |
-| **`seed_300_users.py`** | 300 tài khoản học sinh (đồng bộ SQLite & Supabase) | `student_300_1@e16.edu.vn` ~ `student_300_300@e16.edu.vn` | `123456` | Kiểm thử chịu tải số lượng lớn người dùng. |
-| **`seed_complex_data.py`** | 15-20 giáo viên, nhiều khóa học/bài học/quizzes phức tạp | `teacher_1_[random]@e16.edu.vn` ~ `teacher_N_[random]@e16.edu.vn` (Yêu cầu có sẵn học sinh từ script 300) | `123456` | Kiểm thử dữ liệu phân tích Analytics phức tạp đa cấp độ. |
-| **`seed_quizzes_assignments.py`** | 1 Quiz trắc nghiệm, 1 Assignment tự luận, giả lập điểm số | Không tạo thêm (Sử dụng nhóm học sinh `student_demo_*` có sẵn) | N/A | Kiểm thử luồng Sổ điểm (Gradebook) và nộp bài (Submission). |
-| **`seed_learning_logs.py`** | Logs hoạt động học tập ngẫu nhiên (SQLite & Supabase) | Không tạo thêm (Sử dụng học sinh & bài học có sẵn) | N/A | Mô phỏng dòng thời gian học tập cho các biểu đồ Analytics. |
+| Role | Email | Mật khẩu |
+| --- | --- | --- |
+| Admin | `admin@e16.local` | `admine16` |
+| Teacher | `teacher@e16.local` | `teachere16` |
+| Student | `student@e16.local` | `studente16` |
+| Student demo | `student1@e16.local` đến `student5@e16.local` | `E16_SEED_PASSWORD` hoặc `demo-password` |
 
----
+Không dùng các tài khoản/mật khẩu demo trong production.
 
-## ⚠️ Lưu ý về Tương thích Phiên bản Python (Troubleshooting)
+## Kiểm thử
 
-Một số thư viện lõi của hệ thống (như **SQLAlchemy v2.0.23** và **Flask-Migrate / Alembic**) có thể gặp lỗi không tương thích trong quá trình import/khởi tạo nếu dự án được chạy bằng các phiên bản Python quá mới như **Python 3.14.x** (phiên bản pre-release hoặc đang thử nghiệm).
+```bash
+pytest
+```
 
-### 🛠️ Hướng khắc phục đề xuất:
-1. **Sử dụng phiên bản Python Khuyến nghị**: Khuyến khích sử dụng **Python 3.11** hoặc **Python 3.12** để đảm bảo tính ổn định và tương thích tuyệt đối cho môi trường kiểm thử và vận hành.
-2. **Sử dụng Môi trường ảo (Virtual Environment) chỉ định phiên bản**:
-   ```powershell
-   # Tạo môi trường ảo với Python 3.12 (nếu máy có sẵn nhiều phiên bản)
-   py -3.12 -m venv venv
-   
-   # Kích hoạt môi trường ảo
-   .\venv\Scripts\Activate.ps1
-   
-   # Cài đặt lại thư viện
-   pip install -r requirements.txt
-   ```
+Các nhóm test hiện có:
 
----
+- Auth: đăng ký, đăng nhập, logout, inactive account, security headers.
+- Admin: seed protection, import CSV, soft delete user, pagination, audit log, metrics, export.
+- Courses/communication/storage/grading: enrollment, forum/notification, upload backend, quiz/assignment grading.
 
-© 2024 E16 Education Team. All rights reserved.
+## Hiện trạng đã đọc từ repo
+
+- App factory đã tách extension, config theo môi trường và blueprint theo domain.
+- Production có fail-fast cho `SECRET_KEY`, CSP/Talisman, CSRF, rate limit, health checks `/healthz`, readiness `/readyz`, metrics `/metricsz`.
+- Admin đã có pagination cho users/audit logs, CSV import, course approval, audit logging.
+- Teacher đã có quản lý course, lesson, quiz, assignment, gradebook, analytics và export.
+- Student đã có catalog, checkout mô phỏng, enrollment, learning page, completion tracking, quiz, assignment, transcript, calendar và certificate.
+- Storage service đã validate extension cơ bản và hỗ trợ local/S3.
+- BRD production đã có checklist khá đầy đủ, nhưng README cũ bị dài và khó dùng làm entry point.
+
+## Điểm cần cải thiện
+
+### P0 - Chặn lỗi production và bảo mật
+
+- Rà soát và chuẩn hóa UTF-8 cho README, `.env.example`, flash messages, seed data và các string tiếng Việt trong source để tránh mojibake giữa Windows/Linux/CI.
+- Rà lại authorization theo owner/enrollment cho mọi route nested: quiz, assignment, announcement, forum, submission, certificate và file download.
+- File bài nộp hiện có thể được render qua static path; production nên dùng private object storage, signed URL và kiểm tra quyền trước khi tải.
+- Luồng thanh toán hiện là mô phỏng QR/IPN trong route student; cần tách rõ mock/dev và tích hợp payment thật nếu đưa vào production.
+- Chuẩn hóa CSRF cho mọi state-changing route và kiểm tra các endpoint JSON/POST.
+- Bỏ hoặc khóa tuyệt đối seed/demo credentials ở production; giữ `/admin/seed` chỉ cho development/staging có kiểm soát.
+- Loại bỏ dần `unsafe-inline` trong CSP bằng nonce hoặc file script/style riêng.
+- Bổ sung secret scanning và dependency/security scan trong CI.
+
+### P1 - Data integrity và lỗi runtime
+
+- Sửa bug trong `teacher.export_gradebook`: biến `max_rows` được log nhưng chưa khai báo trong hàm.
+- Chuẩn hóa timezone: code đang dùng cả `utcnow()` timezone-aware và `datetime.utcnow()` naive trong checkout/enrollment.
+- Chuẩn hóa enum/constant cho `role`, `course.status`, `enrollment.status`, `submission.status`, `notification.type`.
+- Thêm/rà lại database constraints và migration cho các quan hệ quan trọng: enrollment, certificate, quiz answers, submissions.
+- Hoàn thiện cascade/soft-delete policy cho user, course, lesson, quiz, assignment để tránh orphan data.
+- Validate input form chặt hơn: score, pass_score, max_attempts, time_limit, deadline, URL video/document, category, text length.
+- Bổ sung transaction boundary cho các flow nhiều bước như grade + notify, complete lesson + issue certificate, import CSV.
+
+### P2 - Test coverage và CI
+
+- Thêm test ma trận role/owner/enrollment cho tất cả route nhạy cảm.
+- Thêm test cho checkout timeout, pending payment, simulated IPN và trạng thái enrollment.
+- Thêm test cho quiz random question, checkbox/fill-in-blank review, attempt limit và due date.
+- Thêm test cho assignment deadline, upload invalid MIME/extension/size và private file access.
+- Thêm test cho certificate public privacy, revoked/deleted course và incomplete completion rate.
+- Thêm CI chạy `pytest`, migration check, Docker build và dependency scan.
+- Đo coverage, đặt ngưỡng tối thiểu cho route/service core.
+
+### P3 - Vận hành production
+
+- Bổ sung tài liệu biến môi trường production: Redis rate limiter, SMTP, S3, OAuth, metrics token, export/import limits.
+- Thiết lập backup/restore PostgreSQL và diễn tập restore định kỳ.
+- Thiết lập log aggregation, alerting, uptime check, error-rate/latency alerts.
+- Chuyển email batch, export lớn và analytics aggregation sang background jobs.
+- Tối ưu query dashboard/analytics/gradebook để tránh N+1 ở dữ liệu lớn.
+- Chuẩn hóa Docker startup: migration fail-fast, non-root user, writable upload path và healthcheck.
+
+### P4 - UX và maintainability
+
+- Giảm inline style trong templates, gom component/style lặp lại vào CSS hoặc macro Jinja.
+- Thêm pagination/search/filter nhất quán cho bảng lớn: course list, submissions, gradebook, notifications, pending courses.
+- Tách business logic khỏi route vào service layer để dễ test và giảm file blueprint quá dài.
+- Chuẩn hóa thông báo lỗi/thành công và form validation trên UI.
+- Bổ sung accessibility smoke test cho các trang chính.
+- Tạo route inventory hoặc OpenAPI/internal QA checklist tự động từ Flask routes.
+
+## Roadmap đề xuất
+
+1. Hardening nhanh: chuẩn hóa encoding, sửa bug export gradebook, timezone checkout, route authorization và file access.
+2. Test nền: thêm test cho role/owner/enrollment, payment mock, assignment upload và certificate privacy.
+3. Production infra: CI, Docker build check, Redis limiter, PostgreSQL backup/restore, S3 private uploads, monitoring.
+4. Refactor vừa đủ: tách service layer cho grading/course/payment/notification, chuẩn hóa enum và validation.
+5. UX/data scale: pagination/filter, background jobs, analytics performance và admin health dashboard.
+
+## Checklist trước production
+
+- [x] `pytest` pass 100% với 47/47 test cases.
+- [x] Migration chạy thành công trên database sạch và có script dọn dẹp trùng lặp.
+- [x] Docker image build và app chạy non-root (`e16user`).
+- [x] UI/tài liệu hiển thị tiếng Việt đúng trên Windows, Linux và CI.
+- [x] Bền vững hóa Quiz Review lưu trữ hoàn toàn qua Database (loại bỏ session).
+- [x] Refactor toàn bộ route lớn: tách Payment, Submission, Quiz, Course vào Service Layer chuẩn.
+- [x] Route nhạy cảm có test unauthorized/forbidden chặt chẽ (`test_role_matrix.py`).
+- [x] Redis rate limiter được cấu hình và bật bằng `RATELIMIT_STORAGE_URI`.
+- [ ] Upload production dùng S3-compatible private storage hoặc endpoint kiểm quyền.
+- [ ] `/healthz`, `/readyz`, `/metricsz` được kiểm tra tích hợp trong staging.
+- [ ] Backup/restore được kiểm chứng định kỳ.

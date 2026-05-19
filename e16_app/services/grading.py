@@ -29,6 +29,7 @@ class GradingService:
             if not isinstance(user_answer_list, list):
                 user_answer_list = [user_answer_list]
                 
+            user_answer_list = [val for val in user_answer_list if val is not None and str(val).strip() != ""]
             is_correct = False
             
             if q.q_type == 'mcq':
@@ -41,6 +42,10 @@ class GradingService:
                     selected_choice = db.session.query(Choice).filter_by(id=user_choice_id, question_id=q.id).first()
                     if selected_choice:
                         db.session.add(QuizAnswer(attempt_id=attempt.id, question_id=q.id, choice_id=user_choice_id))
+                    else:
+                        db.session.add(QuizAnswer(attempt_id=attempt.id, question_id=q.id, choice_id=None))
+                else:
+                    db.session.add(QuizAnswer(attempt_id=attempt.id, question_id=q.id, choice_id=None))
                     
             elif q.q_type == 'checkbox':
                 user_choice_ids = user_answer_list
@@ -50,13 +55,21 @@ class GradingService:
                 if set(user_choice_ids) == set(correct_choice_ids) and len(user_choice_ids) > 0:
                     is_correct = True
                     
-                for cid in user_choice_ids:
-                    selected_choice = db.session.query(Choice).filter_by(id=cid, question_id=q.id).first()
-                    if selected_choice:
-                        db.session.add(QuizAnswer(attempt_id=attempt.id, question_id=q.id, choice_id=cid))
+                if user_choice_ids:
+                    inserted_any = False
+                    for cid in user_choice_ids:
+                        selected_choice = db.session.query(Choice).filter_by(id=cid, question_id=q.id).first()
+                        if selected_choice:
+                            db.session.add(QuizAnswer(attempt_id=attempt.id, question_id=q.id, choice_id=cid))
+                            inserted_any = True
+                    if not inserted_any:
+                        db.session.add(QuizAnswer(attempt_id=attempt.id, question_id=q.id, choice_id=None))
+                else:
+                    db.session.add(QuizAnswer(attempt_id=attempt.id, question_id=q.id, choice_id=None))
                     
             elif q.q_type == 'fill_in_blank':
                 user_text = user_answer_list[0] if user_answer_list else ""
+                raw_user_text = user_text
                 user_text = user_text.strip().lower()
                 correct_choices = db.session.query(Choice).filter_by(question_id=q.id).all()
                 
@@ -64,6 +77,8 @@ class GradingService:
                     if c.text.strip().lower() == user_text:
                         is_correct = True
                         break
+                        
+                db.session.add(QuizAnswer(attempt_id=attempt.id, question_id=q.id, choice_id=None, text_answer=raw_user_text))
                         
             if is_correct:
                 correct_count += 1

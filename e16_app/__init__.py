@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from dotenv import load_dotenv
 from flask import Flask, render_template, request
@@ -263,9 +264,17 @@ def _register_cli(app):
     @app.cli.command("seed")
     @click.option("--key", default=None, help="Seed password (or set E16_SEED_PASSWORD env)")
     def seed_command(key):
-        """Seed the database with demo data."""
+        """Seed the database with demo data. Blocked in production."""
         import os as _os
-        seed_password = key or _os.getenv("E16_SEED_PASSWORD", "demo-password")
+        import sys
+
+        app_env = _os.getenv("APP_ENV", _os.getenv("FLASK_ENV", "production")).lower()
+        if app_env == "production":
+            click.echo("ERROR: Seeding is blocked in production environment (APP_ENV=production).", err=True)
+            click.echo("Set APP_ENV=development to run seed.", err=True)
+            sys.exit(1)
+
+        seed_password = key or _os.getenv("E16_SEED_PASSWORD") or "demo-password"
 
         # Re-use existing seed logic from auth blueprint
         from .blueprints.auth import _run_seed

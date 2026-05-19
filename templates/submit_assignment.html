@@ -44,7 +44,7 @@
           <label>Tải lên file đính kèm</label>
           <input type="file" name="file" style="padding: 10px; background: var(--bg-soft); border-radius: 8px;">
           {% if submission and submission.file_path %}
-            <p style="font-size: 0.8rem; margin-top: 8px; color: var(--text-muted);">File hiện tại: <a href="{{ url_for('static', filename=submission.file_path) }}" target="_blank">Xem file</a></p>
+            <p style="font-size: 0.8rem; margin-top: 8px; color: var(--text-muted);">File hiện tại: <a href="{{ url_for('student.download_own_submission_file', submission_id=submission.id) }}" target="_blank">Xem file</a></p>
           {% endif %}
         </div>
         {% endif %}

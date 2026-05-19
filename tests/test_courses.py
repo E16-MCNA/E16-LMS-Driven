@@ -2,7 +2,7 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 from e16_app import create_app, db
-from e16_app.models import User, Course, Lesson, Enrollment, Quiz, Assignment, Question, Certificate, Submission
+from e16_app.models import User, Course, Lesson, Enrollment, LearningLog, Quiz, Assignment, Question, Choice, Certificate, Submission
 
 @pytest.fixture
 def app():
@@ -61,6 +61,9 @@ def test_student_enrollment(client, app, student_user, teacher_user):
     with client.session_transaction() as sess:
         sess["_user_id"] = student_user
         sess["_fresh"] = True
+
+    checkout_response = client.get(f"/checkout/{course_id}")
+    assert checkout_response.status_code == 200
 
     response = client.post(f"/enroll/{course_id}")
     assert response.status_code == 302
@@ -150,6 +153,56 @@ def test_teacher_cannot_add_question_to_other_teachers_quiz(client, app, teacher
         assert db.session.query(Question).filter_by(quiz_id=quiz_id).count() == 0
 
 
+def test_student_can_render_quiz_with_shuffled_choices(client, app, student_user, teacher_user):
+    with app.app_context():
+        course = Course(title="Quiz Course", teacher_id=teacher_user, status="published")
+        db.session.add(course)
+        db.session.flush()
+        db.session.add(Enrollment(user_id=student_user, course_id=course.id, status="active"))
+        quiz = Quiz(title="Runtime Quiz", course_id=course.id, is_published=True)
+        db.session.add(quiz)
+        db.session.flush()
+        question = Question(quiz_id=quiz.id, text="1+1?")
+        db.session.add(question)
+        db.session.flush()
+        db.session.add_all([
+            Choice(question_id=question.id, text="2", is_correct=True),
+            Choice(question_id=question.id, text="3", is_correct=False),
+        ])
+        db.session.commit()
+        course_id = course.id
+        quiz_id = quiz.id
+
+    with client.session_transaction() as sess:
+        sess["_user_id"] = student_user
+        sess["_fresh"] = True
+
+    response = client.get(f"/learn/{course_id}/quiz/{quiz_id}")
+
+    assert response.status_code == 200
+    assert b"Runtime Quiz" in response.data
+
+
+def test_teacher_can_export_gradebook(client, app, student_user, teacher_user):
+    with app.app_context():
+        course = Course(title="Exportable Gradebook", teacher_id=teacher_user, status="published")
+        db.session.add(course)
+        db.session.flush()
+        db.session.add(Enrollment(user_id=student_user, course_id=course.id, status="active"))
+        db.session.commit()
+        course_id = course.id
+
+    with client.session_transaction() as sess:
+        sess["_user_id"] = teacher_user
+        sess["_fresh"] = True
+
+    response = client.get(f"/teacher/courses/{course_id}/gradebook/export")
+
+    assert response.status_code == 200
+    assert "Exportable Gradebook" not in response.data.decode("utf-8")
+    assert "student_test@e16.edu.vn" in response.data.decode("utf-8")
+
+
 def test_user_course_pairs_are_unique(app, student_user, teacher_user):
     with app.app_context():
         course = Course(title="Unique Course", teacher_id=teacher_user, status="published")
@@ -175,6 +228,10 @@ def test_public_certificate_masks_student_email(client, app, student_user, teach
         course = Course(title="Privacy Course", teacher_id=teacher_user, status="published")
         db.session.add(course)
         db.session.flush()
+        lesson = Lesson(course_id=course.id, title="Intro", sequence_order=1)
+        db.session.add(lesson)
+        db.session.flush()
+        db.session.add(LearningLog(user_id=student_user, lesson_id=lesson.id, action_type="complete"))
         cert = Certificate(user_id=student_user, course_id=course.id)
         db.session.add(cert)
         db.session.commit()

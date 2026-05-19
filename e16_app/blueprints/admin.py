@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import csv
 import io
 import json
@@ -347,14 +348,15 @@ def reject_course(course_id):
         flash("Đã từ chối khóa học.", "info")
     return redirect(url_for("admin.pending_courses"))
 
-@bp.route("/seed")
+@bp.route("/seed", methods=["GET", "POST"])
 def seed_system():
-    # Security: Only allow seeding in development. Check this before any auth/data logic.
+    # Security: Block seeding entirely in production — return 404 to hide route existence.
     app_env = os.getenv("APP_ENV", os.getenv("FLASK_ENV", "production")).lower()
-    if app_env != "development":
-        return "Forbidden: This action is only allowed in development environment.", 403
+    if app_env == "production":
+        from flask import abort
+        abort(404)
 
-    # Allow seeding without login ONLY if no users exist in the DB
+    # Allow seeding without login ONLY if no users exist in the DB (initial setup)
     user_count = db.session.query(User).count()
     if user_count > 0:
         # If users exist, require admin role
@@ -362,6 +364,25 @@ def seed_system():
         if not current_user.is_authenticated or current_user.role != "admin":
             flash("Bạn cần quyền Admin để chạy lại lệnh Seed.", "error")
             return redirect(url_for("auth.login"))
+
+    if request.method != "POST":
+        from flask import render_template_string
+        return render_template_string('''
+            {% extends "base.html" %}
+            {% block content %}
+            <div class="card" style="max-width: 600px; margin: 40px auto; padding: 24px; text-align: center;">
+                <h2>Xác nhận khởi tạo dữ liệu mẫu</h2>
+                <p style="color: var(--text-muted); margin-bottom: 24px;">Hành động này sẽ thêm danh mục cấu hình và các tài khoản mẫu vào cơ sở dữ liệu.</p>
+                <form action="{{ url_for('admin.seed_system') }}" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px;">Khởi động Seed</button>
+                </form>
+            </div>
+            {% endblock %}
+        ''')
+
+    # Read seed password from environment — never hardcode in production
+    seed_password = os.getenv("E16_SEED_PASSWORD") or "demo-password"
 
     # Seed Categories
     cats = [
@@ -385,18 +406,17 @@ def seed_system():
         if not db.session.query(SystemSetting).filter_by(key=s_data["key"]).first():
             db.session.add(SystemSetting(**s_data))
 
-    # Seed Users
+    # Seed Users — read password from env var, never hardcode
     from werkzeug.security import generate_password_hash
     users = [
-        {"email": "admin@e16.local", "password_hash": generate_password_hash("admine16"), "role": "admin"},
-        {"email": "teacher@e16.local", "password_hash": generate_password_hash("teachere16"), "role": "teacher"},
-        {"email": "student@e16.local", "password_hash": generate_password_hash("studente16"), "role": "student"}
+        {"email": "admin@e16.local", "password_hash": generate_password_hash(seed_password), "role": "admin"},
+        {"email": "teacher@e16.local", "password_hash": generate_password_hash(seed_password), "role": "teacher"},
+        {"email": "student@e16.local", "password_hash": generate_password_hash(seed_password), "role": "student"}
     ]
     for u_data in users:
         if not db.session.query(User).filter_by(email=u_data["email"]).first():
             db.session.add(User(**u_data))
             
-    seed_password = os.getenv("E16_SEED_PASSWORD", "demo-password")
     for i in range(1, 6):
         email = f"student{i}@e16.local"
         if not db.session.query(User).filter_by(email=email).first():

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import secrets
 from datetime import datetime, timedelta, timezone

@@ -54,3 +54,10 @@ def update_enrollment_if_completed(user_id: str, course_id: str):
                 notify(user_id, "announcement", f"Chúc mừng! Bạn đã nhận được chứng chỉ cho khóa học {db.session.get(CourseModel, course_id).title}", url_for("student.view_certificates"))
             
             db.session.commit()
+
+def class_average_completion_rate(course_id: str):
+    students = db.session.query(Enrollment.user_id).filter_by(course_id=course_id, status="active").all()
+    if not students:
+        return 0.0
+    total_rate = sum(student_completion_rate(s.user_id, course_id) for s in students)
+    return total_rate / len(students)

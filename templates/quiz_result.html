@@ -1,27 +1,98 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card" style="max-width: 600px; margin: 40px auto; text-align: center; padding: 40px;">
-  <div style="font-size: 4rem; margin-bottom: 20px;">
-    {% if attempt.passed %}🎉{% else %}❌{% endif %}
-  </div>
-  <h1 style="margin-bottom: 12px;">Kết quả bài làm</h1>
-  <p style="color: var(--text-muted); margin-bottom: 32px;">Quiz: {{ quiz.title }}</p>
+<div style="max-width: 800px; margin: 0 auto;">
+  <!-- Score Summary Card -->
+  <div class="card" style="text-align: center; padding: 40px; margin-bottom: 32px; position: relative; overflow: hidden;">
+    <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, {% if attempt.passed %}var(--success), #34d399{% else %}var(--danger), #f87171{% endif %});"></div>
+    <div style="font-size: 4rem; margin-bottom: 16px;">
+      {% if attempt.passed %}🎉{% else %}📝{% endif %}
+    </div>
+    <h1 style="margin-bottom: 8px; font-size: 1.5rem;">Kết quả bài làm</h1>
+    <p style="color: var(--text-muted); margin-bottom: 24px;">Quiz: {{ quiz.title }}</p>
 
-  <div style="font-size: 2.5rem; font-weight: 800; color: {% if attempt.passed %}var(--success){% else %}var(--danger){% endif %}; margin-bottom: 8px;">
-    {{ attempt.score }}%
-  </div>
-  <div style="font-weight: 600; margin-bottom: 32px;">
-    {% if attempt.passed %}
-      CHÚC MỪNG! Bạn đã vượt qua bài kiểm tra.
-    {% else %}
-      TIẾC QUÁ! Bạn chưa đạt điểm yêu cầu ({{ quiz.pass_score }}%).
-    {% endif %}
+    <div style="font-size: 3rem; font-weight: 800; color: {% if attempt.passed %}var(--success){% else %}var(--danger){% endif %}; margin-bottom: 8px;">
+      {{ attempt.score|round|int }}%
+    </div>
+    <div style="font-weight: 600; margin-bottom: 8px; font-size: 1.1rem;">
+      {% if attempt.passed %}
+        CHÚC MỪNG! Bạn đã vượt qua bài kiểm tra.
+      {% else %}
+        TIẾC QUÁ! Bạn chưa đạt điểm yêu cầu ({{ quiz.pass_score }}%).
+      {% endif %}
+    </div>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">Điểm đạt tối thiểu: {{ quiz.pass_score }}%</p>
+
+    <div style="display: flex; gap: 16px; justify-content: center; margin-top: 24px;">
+      <a href="{{ url_for('student.learn', course_id=course_id) }}" class="btn btn-primary" style="min-width: 160px;">Quay lại khóa học</a>
+      {% if can_retry %}
+        <a href="{{ url_for('student.take_quiz', course_id=course_id, quiz_id=quiz.id) }}" class="btn btn-outline" style="min-width: 160px;">🔄 Làm lại (đổi đề)</a>
+      {% endif %}
+    </div>
   </div>
 
-  <div style="display: flex; gap: 16px;">
-    <a href="{{ url_for('student.learn', course_id=course_id) }}" class="btn btn-primary" style="flex: 1;">Quay lại khóa học</a>
-    {% if not attempt.passed %}
-      <a href="{{ url_for('student.take_quiz', course_id=course_id, quiz_id=quiz.id) }}" class="btn btn-outline" style="flex: 1;">Thử lại</a>
+  <!-- Answer Review Section -->
+  {% if review_items %}
+  <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+    <h2 style="font-size: 1.25rem;">📋 Xem lại đáp án chi tiết</h2>
+    <span style="font-size: 0.85rem; color: var(--text-muted);">
+      {{ review_items|selectattr('is_correct')|list|length }}/{{ review_items|length }} câu đúng
+    </span>
+  </div>
+
+  {% for item in review_items %}
+    <div class="card" style="margin-bottom: 16px; padding: 24px; border-left: 4px solid {% if item.is_correct %}var(--success){% else %}var(--danger){% endif %};">
+      <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;">
+        <div style="width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; flex-shrink: 0; color: #fff; background: {% if item.is_correct %}var(--success){% else %}var(--danger){% endif %};">
+          {% if item.is_correct %}✓{% else %}✗{% endif %}
+        </div>
+        <div style="font-weight: 600; font-size: 1.05rem; line-height: 1.6;">{{ loop.index }}. {{ item.question.text }}</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-left: 40px;">
+        {% for choice in item.choices %}
+          {% set is_selected = choice.id|string in item.selected_choice_ids %}
+          {% set is_correct_choice = choice.id|string in item.correct_choice_ids %}
+          <div style="
+            display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; font-size: 0.92rem;
+            {% if is_correct_choice and is_selected %}
+              background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.4); color: #6ee7b7;
+            {% elif is_selected and not is_correct_choice %}
+              background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; text-decoration: line-through; text-decoration-color: rgba(239,68,68,0.5);
+            {% elif is_correct_choice and not is_selected %}
+              background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.2); color: #6ee7b7;
+            {% else %}
+              background: rgba(255,255,255,0.02); border: 1px solid var(--card-border); color: var(--text-muted);
+            {% endif %}
+          ">
+            <span style="font-size: 0.8rem; flex-shrink: 0; width: 20px; text-align: center;">
+              {% if is_correct_choice %}✅{% elif is_selected %}❌{% else %}○{% endif %}
+            </span>
+            <span>{{ choice.text }}</span>
+            {% if is_selected and is_correct_choice %}
+              <span style="margin-left: auto; font-size: 0.75rem; color: var(--success); font-weight: 600;">Bạn chọn đúng</span>
+            {% elif is_selected and not is_correct_choice %}
+              <span style="margin-left: auto; font-size: 0.75rem; color: var(--danger); font-weight: 600;">Bạn đã chọn</span>
+            {% elif is_correct_choice %}
+              <span style="margin-left: auto; font-size: 0.75rem; color: var(--success); font-weight: 600;">Đáp án đúng</span>
+            {% endif %}
+          </div>
+        {% endfor %}
+        {% if item.question.q_type == 'fill_in_blank' %}
+          <div style="padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.02); border: 1px solid var(--card-border);">
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">Câu trả lời của bạn</div>
+            <div>{{ item.submitted_text or 'Không trả lời' }}</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Bottom Navigation -->
+  <div style="display: flex; gap: 16px; justify-content: center; padding: 24px 0;">
+    <a href="{{ url_for('student.learn', course_id=course_id) }}" class="btn btn-primary" style="min-width: 160px;">Quay lại khóa học</a>
+    {% if can_retry %}
+      <a href="{{ url_for('student.take_quiz', course_id=course_id, quiz_id=quiz.id) }}" class="btn btn-outline" style="min-width: 160px;">🔄 Làm lại (đổi đề)</a>
     {% endif %}
   </div>
 </div>

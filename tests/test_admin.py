@@ -29,7 +29,7 @@ def test_seed_route_is_forbidden_in_production(client, monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     response = client.get("/admin/seed")
 
-    assert response.status_code == 403
+    assert response.status_code == 404
 
 
 def test_import_users_validates_csv_and_imports_optional_fields(client, app):

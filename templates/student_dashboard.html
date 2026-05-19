@@ -1,5 +1,29 @@
 {% extends "base.html" %}
 {% block content %}
+<style>
+  .dash-thumb {
+    width: 72px !important;
+    height: 72px !important;
+    min-width: 72px !important;
+    max-width: 72px !important;
+    min-height: 72px !important;
+    max-height: 72px !important;
+    border-radius: 12px !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    flex-shrink: 0 !important;
+  }
+  .dash-course-card {
+    display: flex !important;
+    gap: 16px !important;
+    align-items: center !important;
+    padding: 16px 20px !important;
+  }
+  .dash-course-card img {
+    display: none !important;
+  }
+</style>
 <header class="top-header">
   <div>
     <h1>Chào mừng trở lại!</h1>
@@ -31,10 +55,10 @@
     {% if rows %}
       <div style="display: flex; flex-direction: column; gap: 16px;">
         {% for row in rows %}
-          <div class="card" style="display: flex; gap: 24px; align-items: center;">
-            <img src="{{ row.course.cover_image_url or 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3' }}" alt="" style="width: 100px; height: 100px; border-radius: 12px; object-fit: cover; flex-shrink: 0; min-width: 100px; max-width: 100px;">
-            <div style="flex: 1;">
-              <h3 style="margin-bottom: 8px;">{{ row.course.title }}</h3>
+          <div class="card dash-course-card">
+            <div class="dash-thumb" style="background-image: url('{{ row.course.cover_image_url or 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=150&h=150&fit=crop' }}');"></div>
+            <div style="flex: 1; min-width: 0;">
+              <h3 style="margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ row.course.title }}</h3>
               <div class="progress-container" style="margin-bottom: 12px;">
                 <div class="progress-bar">
                   <div class="progress-fill" style="width: {{ row.my_rate }}%;"></div>

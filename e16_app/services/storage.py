@@ -1,6 +1,8 @@
+# -*- coding: utf-8 -*-
 import abc
 import os
 import uuid
+from pathlib import Path
 
 from flask import current_app
 from werkzeug.utils import secure_filename
@@ -56,6 +58,14 @@ class BaseStorage(abc.ABC):
     def get_url(self, file_path: str) -> str:
         """Trả về URL public để render trong template."""
 
+    def secure_get_url(self, file_path: str) -> str:
+        """Trả về URL có kiểm soát quyền. Default fallback to get_url."""
+        return self.get_url(file_path)
+
+    def send_file_response(self, file_path: str):
+        """Stream file qua Flask send_file. Only for local storage."""
+        raise NotImplementedError("send_file_response only supported for local storage.")
+
 
 # ---------- Local backend (dùng ngay, không cần credential) ----------
 
@@ -80,6 +90,17 @@ class LocalStorage(BaseStorage):
     def get_url(self, file_path: str) -> str:
         from flask import url_for
         return url_for("static", filename=file_path)
+
+    def send_file_response(self, file_path: str):
+        """Stream file securely via send_file after authorization check."""
+        from flask import send_file, abort
+        base = Path(current_app.static_folder).resolve()
+        full = (base / file_path).resolve()
+        if base not in full.parents and full != base:
+            abort(404)
+        if not full.exists() or not full.is_file():
+            abort(404)
+        return send_file(full, as_attachment=True)
 
 
 # ---------- S3 backend (bật khi cần, không ảnh hưởng local dev) ----------
@@ -116,6 +137,14 @@ class S3Storage(BaseStorage):
 
     def get_url(self, file_path: str) -> str:
         return f"https://{self._bucket}.s3.{self._region}.amazonaws.com/{file_path}"
+
+    def secure_get_url(self, file_path: str) -> str:
+        """Generate presigned URL with 5-minute TTL for private file access."""
+        return self._client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": self._bucket, "Key": file_path},
+            ExpiresIn=300  # 5 minutes
+        )
 
 
 # ---------- Factory — đọc env var 1 lần lúc khởi động ----------

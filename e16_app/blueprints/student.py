@@ -1,6 +1,7 @@
+# -*- coding: utf-8 -*-
 import os
 from werkzeug.utils import secure_filename
-from flask import Blueprint, flash, redirect, render_template, request, url_for, current_app
+from flask import Blueprint, flash, redirect, render_template, request, url_for, current_app, session
 from flask_login import current_user
 from sqlalchemy import func
 
@@ -117,71 +118,47 @@ def dashboard():
 @login_required
 @role_required("student")
 def checkout(course_id):
-    import random
-    import string
-    from datetime import datetime
+    from ..services.payment import get_or_create_pending_enrollment, generate_tx_code, get_seconds_remaining
     course = db.session.get(Course, course_id)
     if not course or course.status != "published" or course.is_deleted:
         flash("Khóa học không khả dụng.", "error")
         return redirect(url_for("student.list_courses"))
         
-    enrollment = db.session.query(Enrollment).filter_by(user_id=current_user.id, course_id=course_id).first()
+    enrollment, _ = get_or_create_pending_enrollment(current_user.id, course_id)
     
-    if enrollment:
-        if enrollment.status in ["active", "completed"]:
-            return redirect(url_for("student.learn", course_id=course_id))
-        elif enrollment.status == "pending_payment":
-            # Check if expired (10 minutes = 600 seconds)
-            time_diff = datetime.utcnow() - enrollment.enrolled_at
-            if time_diff.total_seconds() > 600:
-                db.session.delete(enrollment)
-                db.session.commit()
-                flash("Phiên thanh toán QR đã hết hạn (quá 10 phút). Vui lòng quét lại.", "warning")
-                enrollment = None
-                
-    if not enrollment:
-        # Create a new pending enrollment with timestamp
-        enrollment = Enrollment(user_id=current_user.id, course_id=course_id, status="pending_payment", enrolled_at=datetime.utcnow())
-        db.session.add(enrollment)
-        db.session.commit()
-        
-    # Generate unique transaction code
-    random_str = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
-    tx_code = f"E16PAY{random_str}"
+    if enrollment.status in ("active", "completed"):
+        return redirect(url_for("student.learn", course_id=course_id))
     
-    # Calculate seconds left in 10-minute window
-    time_diff = datetime.utcnow() - enrollment.enrolled_at
-    seconds_left = max(0, int(600 - time_diff.total_seconds()))
+    if enrollment.status == "pending_payment":
+        from ..time_utils import utcnow, ensure_utc
+        time_diff = utcnow() - ensure_utc(enrollment.enrolled_at)
+        if time_diff.total_seconds() > 600:
+            flash("Phiên thanh toán QR đã hết hạn (quá 10 phút). Vui lòng quét lại.", "warning")
+            enrollment, _ = get_or_create_pending_enrollment(current_user.id, course_id)
     
-    return render_template("checkout.html", course=course, tx_code=tx_code, seconds_left=seconds_left)
+    return render_template(
+        "checkout.html",
+        course=course,
+        tx_code=generate_tx_code(),
+        seconds_left=get_seconds_remaining(enrollment),
+        payment_mode=current_app.config.get("PAYMENT_MODE", "mock"),
+    )
 
 
 @bp.post("/enroll/<course_id>")
 @login_required
 @role_required("student")
 def enroll(course_id):
-    from datetime import datetime
+    from ..services.payment import activate_enrollment
     course = db.session.get(Course, course_id)
     if not course or course.status != "published" or course.is_deleted:
         flash("Khóa học không khả dụng.", "error")
         return redirect(url_for("student.list_courses"))
         
-    enrollment = db.session.query(Enrollment).filter_by(user_id=current_user.id, course_id=course_id).first()
-    if not enrollment:
-        flash("Không tìm thấy thông tin đăng ký.", "error")
+    success, message = activate_enrollment(current_user.id, course_id)
+    if not success:
+        flash(message, "error")
         return redirect(url_for("student.list_courses"))
-        
-    # Verify expiration (10 minutes)
-    time_diff = datetime.utcnow() - enrollment.enrolled_at
-    if time_diff.total_seconds() > 600:
-        db.session.delete(enrollment)
-        db.session.commit()
-        flash("Giao dịch thất bại: Mã QR đã hết hạn thanh toán (quá 10 phút)!", "error")
-        return redirect(url_for("student.list_courses"))
-        
-    # Activate enrollment
-    enrollment.status = "active"
-    db.session.commit()
     
     logger.log("pay_course", user_id=current_user.id, user_email=current_user.email, resource_type="course", resource_id=course_id, metadata={"course_title": course.title, "amount": course.price})
     flash(f"Thanh toán và đăng ký thành công khóa học {course.title}!", "success")
@@ -192,24 +169,16 @@ def enroll(course_id):
 @login_required
 @role_required("student")
 def simulate_ipn(course_id):
-    enrollment = db.session.query(Enrollment).filter_by(user_id=current_user.id, course_id=course_id, status="pending_payment").first()
-    if not enrollment:
-        return {"status": "error", "message": "Giao dịch không tồn tại."}, 400
-        
-    # Verify expiration (10 minutes)
-    from datetime import datetime
-    time_diff = datetime.utcnow() - enrollment.enrolled_at
-    if time_diff.total_seconds() > 600:
-        db.session.delete(enrollment)
-        db.session.commit()
-        return {"status": "expired", "message": "Phiên thanh toán đã quá 10 phút và đã bị hủy."}, 400
-        
-    # Activate
-    enrollment.status = "active"
-    db.session.commit()
+    if current_app.config.get("PAYMENT_MODE", "mock") == "real":
+        return {"status": "error", "message": "Tính năng thanh toán thực chưa được triển khai. Vui lòng liên hệ admin."}, 501
+
+    from ..services.payment import activate_enrollment
+    success, message = activate_enrollment(current_user.id, course_id)
+    if not success:
+        return {"status": "error", "message": message}, 400
     
-    # Log payment
-    logger.log("pay_course", user_id=current_user.id, user_email=current_user.email, resource_type="course", resource_id=course_id, metadata={"course_title": enrollment.course.title, "amount": enrollment.course.price})
+    course = db.session.get(Course, course_id)
+    logger.log("pay_course", user_id=current_user.id, user_email=current_user.email, resource_type="course", resource_id=course_id, metadata={"course_title": course.title if course else "", "amount": course.price if course else 0})
     return {"status": "success", "message": "Thanh toán thành công qua cổng MB Bank IPN!"}
 
 
@@ -217,10 +186,8 @@ def simulate_ipn(course_id):
 @login_required
 @role_required("student")
 def cancel_checkout(course_id):
-    enrollment = db.session.query(Enrollment).filter_by(user_id=current_user.id, course_id=course_id, status="pending_payment").first()
-    if enrollment:
-        db.session.delete(enrollment)
-        db.session.commit()
+    from ..services.payment import cancel_pending_enrollment
+    if cancel_pending_enrollment(current_user.id, course_id):
         flash("Đã hủy giao dịch thanh toán QR.", "info")
     return redirect(url_for("student.list_courses"))
 
@@ -235,11 +202,16 @@ def learn(course_id):
         
     enrollment = db.session.query(Enrollment).filter(Enrollment.user_id == current_user.id, Enrollment.course_id == course_id).first()
     if not enrollment:
+        flash("Bạn chưa đăng ký khóa học này.", "error")
         return redirect(url_for("student.list_courses"))
         
     if enrollment.status == "pending_payment":
         flash("Vui lòng hoàn tất thanh toán chuyển khoản QR để tham gia khóa học.", "warning")
         return redirect(url_for("student.checkout", course_id=course_id))
+        
+    if enrollment.status not in ("active", "completed"):
+        flash("Đăng ký khóa học của bạn không còn hoạt động.", "error")
+        return redirect(url_for("student.list_courses"))
         
     lessons = db.session.query(Lesson).filter(Lesson.course_id == course_id).order_by(Lesson.sequence_order.asc()).all()
     quizzes = db.session.query(Quiz).filter_by(course_id=course_id, is_published=True).all()
@@ -253,6 +225,9 @@ def learn(course_id):
     
     db.session.add(LearningLog(user_id=current_user.id, lesson_id=selected_lesson.id, action_type="start", timestamp=utcnow()))
     db.session.commit()
+    
+    # Track lesson open timestamp for minimum-time enforcement (90 seconds)
+    session[f"lesson_start_{selected_lesson.id}"] = utcnow().isoformat()
     logger.log("view_lesson", user_id=current_user.id, user_email=current_user.email, resource_type="lesson", resource_id=selected_lesson.id, metadata={"course_id": course_id, "lesson_title": selected_lesson.title})
 
     completed_ids = {
@@ -283,9 +258,27 @@ def learn(course_id):
 def mark_complete(course_id, lesson_id):
     lesson = db.session.get(Lesson, lesson_id)
     enrollment = db.session.query(Enrollment).filter_by(user_id=current_user.id, course_id=course_id).first()
-    if not lesson or lesson.course_id != course_id or not enrollment:
+    if not lesson or lesson.course_id != course_id or not enrollment or enrollment.status not in ("active", "completed"):
         flash("Bạn không có quyền cập nhật bài học này.", "error")
         return redirect(url_for("student.dashboard"))
+
+    # Enforce minimum 90-second time on lesson page
+    from datetime import datetime
+    lesson_start_key = f"lesson_start_{lesson_id}"
+    lesson_start_iso = session.get(lesson_start_key)
+    if lesson_start_iso:
+        try:
+            lesson_start_time = datetime.fromisoformat(lesson_start_iso)
+            elapsed = (utcnow() - lesson_start_time).total_seconds()
+            if elapsed < 90:
+                remaining = int(90 - elapsed)
+                flash(f"Bạn cần ở trong bài học ít nhất 1 phút 30 giây trước khi đánh dấu hoàn thành. Còn {remaining} giây nữa.", "warning")
+                return redirect(url_for("student.learn", course_id=course_id, lesson=lesson_id))
+        except (ValueError, TypeError):
+            pass
+    else:
+        flash("Vui lòng mở bài học trước khi đánh dấu hoàn thành.", "warning")
+        return redirect(url_for("student.learn", course_id=course_id, lesson=lesson_id))
 
     exists = db.session.query(LearningLog).filter_by(
         user_id=current_user.id, lesson_id=lesson_id, action_type="complete"
@@ -296,6 +289,8 @@ def mark_complete(course_id, lesson_id):
         db.session.commit()
         logger.log("complete_lesson", user_id=current_user.id, user_email=current_user.email, resource_type="lesson", resource_id=lesson_id, metadata={"course_id": course_id})
         update_enrollment_if_completed(current_user.id, course_id)
+        # Clear the lesson start timestamp from session
+        session.pop(lesson_start_key, None)
         
     return redirect(url_for("student.learn", course_id=course_id, lesson=lesson_id))
 
@@ -308,12 +303,12 @@ def mark_complete(course_id, lesson_id):
 def take_quiz(course_id, quiz_id):
     quiz = db.session.get(Quiz, quiz_id)
     enrollment = db.session.query(Enrollment).filter_by(user_id=current_user.id, course_id=course_id).first()
-    if not quiz or quiz.course_id != course_id or not quiz.is_published or not enrollment:
+    if not quiz or quiz.course_id != course_id or not quiz.is_published or not enrollment or enrollment.status not in ("active", "completed"):
         flash("Bạn không có quyền làm bài trắc nghiệm này.", "error")
         return redirect(url_for("student.dashboard"))
     
-    # Check attempts
-    attempts = db.session.query(QuizAttempt).filter_by(user_id=current_user.id, quiz_id=quiz_id).count()
+    from ..services import QuizService
+    attempts = QuizService.get_attempt_count(current_user.id, quiz_id)
     if attempts >= quiz.max_attempts:
         flash("Bạn đã hết lượt làm bài trắc nghiệm này.", "warning")
         return redirect(url_for("student.learn", course_id=course_id))
@@ -328,14 +323,9 @@ def take_quiz(course_id, quiz_id):
             return redirect(url_for("student.learn", course_id=course_id))
 
         logger.log("complete_quiz", user_id=current_user.id, user_email=current_user.email, resource_type="quiz", resource_id=quiz_id, metadata={"score": attempt.score, "course_id": course_id})
-        return render_template("quiz_result.html", quiz=quiz, attempt=attempt, course_id=course_id)
+        return redirect(url_for("student.review_quiz", course_id=course_id, quiz_id=quiz_id, attempt_id=attempt.id))
         
-    questions = db.session.query(Question).filter_by(quiz_id=quiz_id).all()
-    if request.method == "GET" and quiz.random_question_count and quiz.random_question_count > 0:
-        import random
-        if quiz.random_question_count <= len(questions):
-            questions = random.sample(questions, quiz.random_question_count)
-            
+    questions = QuizService.prepare_shuffled_questions(quiz_id)
     return render_template("take_quiz.html", quiz=quiz, questions=questions, course_id=course_id)
 
 
@@ -345,7 +335,7 @@ def take_quiz(course_id, quiz_id):
 def submit_assignment(course_id, assignment_id):
     assignment = db.session.get(Assignment, assignment_id)
     enrollment = db.session.query(Enrollment).filter_by(user_id=current_user.id, course_id=course_id).first()
-    if not assignment or assignment.course_id != course_id or not enrollment:
+    if not assignment or assignment.course_id != course_id or not enrollment or enrollment.status not in ("active", "completed"):
         flash("Bạn không có quyền nộp bài tập này.", "error")
         return redirect(url_for("student.dashboard"))
     
@@ -357,33 +347,99 @@ def submit_assignment(course_id, assignment_id):
             return redirect(url_for("student.learn", course_id=course_id))
             
         from ..services.storage import storage
-        text_content = request.form.get("text_content")
         file = request.files.get("file")
         try:
             file_path = storage.save_file(file, "assignments") if file and assignment.allow_file else None
         except ValueError as exc:
             flash(str(exc), "error")
             return redirect(url_for("student.submit_assignment", course_id=course_id, assignment_id=assignment_id))
-            
-        if existing_sub:
-            existing_sub.text_content = text_content
-            if file_path: existing_sub.file_path = file_path
-            existing_sub.submitted_at = utcnow()
-            existing_sub.status = "pending"
-        else:
-            sub = Submission(
-                assignment_id=assignment_id,
-                user_id=current_user.id,
-                text_content=text_content,
-                file_path=file_path
-            )
-            db.session.add(sub)
         
-        db.session.commit()
+        from ..services.submission import submit_or_update
+        submit_or_update(
+            user_id=current_user.id,
+            assignment_id=assignment_id,
+            text_content=request.form.get("text_content"),
+            file_path=file_path,
+        )
         flash("Đã nộp bài thành công!", "success")
         return redirect(url_for("student.learn", course_id=course_id))
         
     return render_template("submit_assignment.html", assignment=assignment, submission=existing_sub, course_id=course_id)
+
+
+@bp.route("/learn/<course_id>/quiz/<quiz_id>/review/<attempt_id>")
+@login_required
+@role_required("student")
+def review_quiz(course_id, quiz_id, attempt_id):
+    """Show detailed quiz result with correct/incorrect answers for review."""
+    quiz = db.session.get(Quiz, quiz_id)
+    attempt = db.session.get(QuizAttempt, attempt_id)
+    enrollment = db.session.query(Enrollment).filter_by(user_id=current_user.id, course_id=course_id).first()
+    if (
+        not quiz
+        or quiz.course_id != course_id
+        or not enrollment
+        or not attempt
+        or attempt.user_id != current_user.id
+        or attempt.quiz_id != quiz_id
+    ):
+        flash("Không tìm thấy kết quả bài làm.", "error")
+        return redirect(url_for("student.learn", course_id=course_id))
+    
+    # Fetch the questions that were served in this attempt via quiz_answers
+    answer_records = db.session.query(QuizAnswer).filter_by(attempt_id=attempt_id).all()
+    review_question_ids = {a.question_id for a in answer_records}
+    
+    # Build a lookup: question_id -> list of selected choice_ids
+    user_choices_map = {}
+    for a in answer_records:
+        user_choices_map.setdefault(a.question_id, []).append(a.choice_id)
+        
+    # Build a lookup: question_id -> fill_in_blank text answer
+    user_text_map = {}
+    for a in answer_records:
+        if a.text_answer is not None:
+            user_text_map[a.question_id] = a.text_answer
+    
+    # Fetch all questions that were in this attempt
+    questions = db.session.query(Question).filter(Question.id.in_(review_question_ids)).all() if review_question_ids else []
+    
+    # Build review data for each question
+    review_items = []
+    for q in questions:
+        choices = db.session.query(Choice).filter_by(question_id=q.id).all()
+        correct_choice_ids = {str(c.id) for c in choices if c.is_correct}
+        selected_choice_ids = {str(cid) for cid in user_choices_map.get(q.id, []) if cid is not None}
+        
+        if q.q_type == "fill_in_blank":
+            normalized_answers = {c.text.strip().lower() for c in choices}
+            submitted_text = user_text_map.get(q.id, "").strip()
+            is_correct = submitted_text.lower() in normalized_answers if submitted_text else False
+        else:
+            submitted_text = ""
+            is_correct = selected_choice_ids == correct_choice_ids and len(selected_choice_ids) > 0
+        
+        review_items.append({
+            "question": q,
+            "choices": choices,
+            "correct_choice_ids": correct_choice_ids,
+            "selected_choice_ids": selected_choice_ids,
+            "submitted_text": submitted_text,
+            "is_correct": is_correct
+        })
+    
+    # Check remaining attempts
+    total_attempts = db.session.query(QuizAttempt).filter_by(user_id=current_user.id, quiz_id=quiz_id).count()
+    can_retry = total_attempts < quiz.max_attempts
+    
+    return render_template(
+        "quiz_result.html",
+        quiz=quiz,
+        attempt=attempt,
+        course_id=course_id,
+        review_items=review_items,
+        can_retry=can_retry
+    )
 
 
 @bp.route("/transcript")
@@ -395,6 +451,8 @@ def view_transcript():
     
     for en in enrollments:
         course = db.session.get(Course, en.course_id)
+        if not course or course.is_deleted:
+            continue
         quizzes = db.session.query(Quiz).filter_by(course_id=course.id, is_published=True).all()
         assignments = db.session.query(Assignment).filter_by(course_id=course.id).all()
         
@@ -426,13 +484,15 @@ def view_calendar():
     # Deadlines from Assignments
     assign_deadlines = db.session.query(Assignment, Course).join(Course).filter(
         Assignment.course_id.in_(course_ids),
-        Assignment.deadline != None
+        Assignment.deadline != None,
+        Course.is_deleted == False
     ).all()
     
     # Deadlines from Quizzes
     quiz_deadlines = db.session.query(Quiz, Course).join(Course).filter(
         Quiz.course_id.in_(course_ids),
-        Quiz.due_date != None
+        Quiz.due_date != None,
+        Course.is_deleted == False
     ).all()
     
     deadlines = []
@@ -456,8 +516,10 @@ def view_calendar():
             "status": "Đã làm" if attempt else "Chưa làm"
         })
         
-    # Sort by deadline
-    deadlines.sort(key=lambda x: x["deadline"])
+    # Sort by deadline safely (handling potential NoneType values)
+    from datetime import datetime
+    max_datetime = datetime.max
+    deadlines.sort(key=lambda x: x["deadline"] if x["deadline"] is not None else max_datetime)
     
     return render_template("calendar.html", deadlines=deadlines)
 
@@ -488,40 +550,12 @@ def _calc_streak(user_id):
     return max(streak, 1) if dates else 0
 
 
-def student_completion_rate(user_id, course_id):
-    total = db.session.query(Lesson).filter_by(course_id=course_id).count()
-    if total == 0: return 0
-    completed = db.session.query(func.distinct(LearningLog.lesson_id)).join(Lesson).filter(
-        LearningLog.user_id == user_id, 
-        Lesson.course_id == course_id, 
-        LearningLog.action_type == "complete"
-    ).count()
-    return (completed / total) * 100
-
-def class_average_completion_rate(course_id):
-    students = db.session.query(Enrollment.user_id).filter_by(course_id=course_id, status="active").all()
-    if not students: return 0
-    total_rate = sum(student_completion_rate(s.user_id, course_id) for s in students)
-    return total_rate / len(students)
-
-def update_enrollment_if_completed(user_id, course_id):
-    rate = student_completion_rate(user_id, course_id)
-    if rate >= 100:
-        en = db.session.query(Enrollment).filter_by(user_id=user_id, course_id=course_id).first()
-        if en and en.status != "completed":
-            en.status = "completed"
-            
-            # Issue Certificate
-            exists = db.session.query(Certificate).filter_by(user_id=user_id, course_id=course_id).first()
-            if not exists:
-                cert = Certificate(user_id=user_id, course_id=course_id)
-                db.session.add(cert)
-                
-                # Notify student
-                from ..services.notifications import notify
-                notify(user_id, "announcement", f"Chúc mừng! Bạn đã nhận được chứng chỉ hoàn thành khóa học {db.session.get(Course, course_id).title}", url_for("student.view_certificates"))
-                
-            db.session.commit()
+# Import progress calculation helpers from the centralized service layer
+from ..services import (
+    student_completion_rate,
+    class_average_completion_rate,
+    update_enrollment_if_completed
+)
 
 
 @bp.route("/certificates")
@@ -530,6 +564,32 @@ def update_enrollment_if_completed(user_id, course_id):
 def view_certificates():
     certs = db.session.query(Certificate, Course).join(Course).filter(Certificate.user_id == current_user.id).all()
     return render_template("student_certificates.html", certs=certs)
+
+
+@bp.route("/submissions/<submission_id>/download")
+@login_required
+@role_required("student")
+def download_own_submission_file(submission_id):
+    sub = db.session.get(Submission, submission_id)
+    if not sub or sub.user_id != current_user.id or not sub.file_path:
+        flash("File không tồn tại hoặc bạn không có quyền truy cập.", "error")
+        return redirect(url_for("student.dashboard"))
+
+    assignment = db.session.get(Assignment, sub.assignment_id)
+    if not assignment:
+        flash("Bài tập không tồn tại.", "error")
+        return redirect(url_for("student.dashboard"))
+
+    enrollment = db.session.query(Enrollment).filter_by(user_id=current_user.id, course_id=assignment.course_id).first()
+    if not enrollment:
+        flash("Bạn không có quyền truy cập file này.", "error")
+        return redirect(url_for("student.dashboard"))
+
+    from ..services.storage import storage
+    try:
+        return storage.send_file_response(sub.file_path)
+    except NotImplementedError:
+        return redirect(storage.secure_get_url(sub.file_path))
 
 
 @bp.route("/certificates/<cert_code>")
