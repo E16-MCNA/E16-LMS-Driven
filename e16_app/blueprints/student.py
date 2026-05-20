@@ -312,6 +312,10 @@ def take_quiz(course_id, quiz_id):
     if attempts >= quiz.max_attempts:
         flash("Bạn đã hết lượt làm bài trắc nghiệm này.", "warning")
         return redirect(url_for("student.learn", course_id=course_id))
+
+    if quiz.due_date and utcnow() > ensure_utc(quiz.due_date):
+        flash("Bài trắc nghiệm này đã hết hạn.", "warning")
+        return redirect(url_for("student.learn", course_id=course_id))
         
     if request.method == "POST":
         from ..services import GradingService
@@ -603,8 +607,10 @@ def public_certificate(cert_code):
     )
     if not cert:
         return "Chứng chỉ không tồn tại hoặc mã xác thực không đúng.", 404
-    if cert[1].is_deleted:
-        return "Chứng chỉ không còn khả dụng công khai.", 404
+    
+    # Allow certificate to remain valid even if the course is soft-deleted (Scenario 8)
+    # if cert[1].is_deleted:
+    #     return "Chứng chỉ không còn khả dụng công khai.", 404
     
     user = cert[2]
     course = cert[1]
