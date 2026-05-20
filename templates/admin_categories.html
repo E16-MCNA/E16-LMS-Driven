@@ -56,7 +56,7 @@
           <td style="padding: 16px; text-align: right;">
             <div style="display: flex; gap: 8px; justify-content: flex-end;">
               <button onclick="alert('Tính năng sửa nhanh đang phát triển!')" class="btn btn-outline btn-sm">Sửa</button>
-              <form action="{{ url_for('admin.delete_category', cat_id=cat.id) }}" method="post" onsubmit="return confirm('Xóa danh mục này?')">
+              <form action="{{ url_for('admin.delete_category', cat_id=cat.id) }}" method="post" onsubmit="return confirmAction(this, 'Xoa danh muc', 'Xoa danh muc se anh huong den cac khoa hoc lien quan. Ban chac chan?', '🗑️')">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-danger btn-sm">Xóa</button>
               </form>

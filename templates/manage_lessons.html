@@ -50,7 +50,7 @@
                 </div>
                 <div class="actions">
                   <a href="{{ url_for('teacher.edit_lesson', course_id=course.id, lesson_id=ls.id) }}" class="btn btn-outline btn-sm">Sửa</a>
-                  <form action="{{ url_for('teacher.delete_lesson', course_id=course.id, lesson_id=ls.id) }}" method="post" style="display: inline;" onsubmit="return confirm('Xóa bài học này?')">
+                  <form action="{{ url_for('teacher.delete_lesson', course_id=course.id, lesson_id=ls.id) }}" method="post" style="display: inline;" onsubmit="return confirmAction(this, 'Xoa bai hoc', 'Bai hoc se bi xoa vinh vien. Tien do hoan thanh cua hoc vien lien quan cung se mat.', '🗑️')">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-danger btn-sm">Xóa</button>
                   </form>

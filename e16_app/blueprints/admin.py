@@ -443,26 +443,60 @@ def list_reports():
     query = query.order_by(ContentReport.created_at.desc())
     pagination = paginate_query(query, page, per_page)
     
-    enriched_items = []
+    # Optimized: batch-fetch all threads/replies/authors to avoid N+1 queries
     from ..models import ForumThread, ForumReply
-    for report, reporter in pagination["items"]:
+    items = pagination["items"]
+    
+    # Collect all target IDs by type
+    thread_ids = {r.target_id for r, _ in items if r.target_type == "thread"}
+    reply_ids = {r.target_id for r, _ in items if r.target_type == "reply"}
+    
+    # Batch fetch in 2 queries max
+    threads_map = {}
+    replies_map = {}
+    if thread_ids:
+        for t in db.session.query(ForumThread).filter(ForumThread.id.in_(thread_ids)).all():
+            threads_map[t.id] = t
+    if reply_ids:
+        for rep in db.session.query(ForumReply).filter(ForumReply.id.in_(reply_ids)).all():
+            replies_map[rep.id] = rep
+        # Also fetch threads referenced by replies
+        reply_thread_ids = {rep.thread_id for rep in replies_map.values()}
+        missing_thread_ids = reply_thread_ids - set(threads_map.keys())
+        if missing_thread_ids:
+            for t in db.session.query(ForumThread).filter(ForumThread.id.in_(missing_thread_ids)).all():
+                threads_map[t.id] = t
+    
+    # Batch fetch all author users
+    author_ids = set()
+    for t in threads_map.values():
+        author_ids.add(t.author_id)
+    for rep in replies_map.values():
+        author_ids.add(rep.author_id)
+    users_map = {}
+    if author_ids:
+        for u in db.session.query(User).filter(User.id.in_(author_ids)).all():
+            users_map[u.id] = u
+    
+    enriched_items = []
+    for report, reporter in items:
         target_body = ""
         target_author = ""
         course_id = ""
         if report.target_type == "thread":
-            thread = db.session.get(ForumThread, report.target_id)
+            thread = threads_map.get(report.target_id)
             if thread:
-                target_body = f"Chủ đề: {thread.title}\n\nNội dung: {thread.body}"
-                author = db.session.get(User, thread.author_id)
-                target_author = author.email if author else "Không rõ"
+                target_body = f"Chu de: {thread.title}\n\nNoi dung: {thread.body}"
+                author = users_map.get(thread.author_id)
+                target_author = author.email if author else "Khong ro"
                 course_id = thread.course_id
         elif report.target_type == "reply":
-            reply = db.session.get(ForumReply, report.target_id)
+            reply = replies_map.get(report.target_id)
             if reply:
                 target_body = reply.body
-                author = db.session.get(User, reply.author_id)
-                target_author = author.email if author else "Không rõ"
-                thread = db.session.get(ForumThread, reply.thread_id)
+                author = users_map.get(reply.author_id)
+                target_author = author.email if author else "Khong ro"
+                thread = threads_map.get(reply.thread_id)
                 course_id = thread.course_id if thread else ""
                 
         enriched_items.append({

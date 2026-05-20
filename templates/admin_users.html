@@ -73,7 +73,7 @@
           </td>
           <td style="padding: 12px;">
             {% if u.id != current_user.id %}
-              <form action="{{ url_for('admin.delete_user', user_id=u.id) }}" method="post" style="display: inline;" onsubmit="return confirm('Xác nhận xóa người dùng này? Thao tác này không thể hoàn tác.')">
+              <form action="{{ url_for('admin.delete_user', user_id=u.id) }}" method="post" style="display: inline;" onsubmit="return confirmAction(this, 'Xoa nguoi dung', 'Thao tac nay se xoa vinh vien tai khoan va toan bo du lieu lien quan. Khong the hoan tac!', '🚨')">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-danger btn-sm">Xóa</button>
               </form>

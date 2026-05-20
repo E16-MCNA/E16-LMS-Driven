@@ -41,7 +41,7 @@
         </div>
       </div>
     {% endfor %}
-    <button type="submit" id="submitBtn" class="btn btn-primary" style="width: 100%; margin-top: 12px;" onclick="return confirm('Bạn có chắc chắn muốn nộp bài?')">Nộp bài làm</button>
+    <button type="submit" id="submitBtn" class="btn btn-primary" style="width: 100%; margin-top: 12px;" onclick="event.preventDefault(); return confirmAction(this.closest('form'), 'Nop bai lam', 'Sau khi nop, ban khong the chinh sua cau tra loi. Ban chac chan muon nop bai?', '📝')">Nộp bài làm</button>
   </form>
 </div>
 

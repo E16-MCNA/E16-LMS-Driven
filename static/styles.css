@@ -245,7 +245,8 @@ header.top-header {
 }
 
 .card:hover {
-  border-color: rgba(143, 164, 255, 0.3);
+  border-color: rgba(99, 102, 241, 0.25);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3), 0 0 20px rgba(99, 102, 241, 0.05);
   transform: translateY(-2px);
 }
 
@@ -536,6 +537,180 @@ input:focus, select:focus, textarea:focus {
 .auth-card {
   width: 100%;
   max-width: 400px;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--card-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(143, 164, 255, 0.3);
+}
+
+/* Glassmorphism Confirm Modal */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 6, 20, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+.confirm-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+.confirm-modal {
+  background: rgba(16, 22, 50, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(143, 164, 255, 0.15);
+  border-radius: 20px;
+  padding: 32px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+  transform: translateY(20px) scale(0.95);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.confirm-overlay.active .confirm-modal {
+  transform: translateY(0) scale(1);
+}
+.confirm-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+}
+.confirm-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #fff;
+}
+.confirm-message {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+.confirm-actions .btn {
+  min-width: 100px;
+}
+
+/* Circular Progress Ring (Lesson Timer) */
+.timer-ring-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.timer-ring {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+.timer-ring svg {
+  transform: rotate(-90deg);
+  width: 48px;
+  height: 48px;
+}
+.timer-ring-bg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.06);
+  stroke-width: 4;
+}
+.timer-ring-progress {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 126;
+  stroke-dashoffset: 126;
+  transition: stroke-dashoffset 1s linear, stroke 0.5s ease;
+}
+.timer-ring-progress.complete {
+  stroke: var(--success);
+}
+.timer-ring-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+
+/* Score Color Bands (Gradebook) */
+.score-excellent {
+  color: var(--success);
+  font-weight: 700;
+}
+.score-good {
+  color: #22d3ee;
+  font-weight: 600;
+}
+.score-average {
+  color: var(--warning);
+  font-weight: 600;
+}
+.score-below {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Status Glow Dot */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+.status-dot.active {
+  background: var(--success);
+  box-shadow: 0 0 8px var(--success);
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+.status-dot.pending {
+  background: var(--warning);
+  box-shadow: 0 0 8px var(--warning);
+}
+.status-dot.inactive {
+  background: var(--text-muted);
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--success); }
+  50% { opacity: 0.6; box-shadow: 0 0 16px var(--success); }
 }
 
 /* Responsive */

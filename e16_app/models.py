@@ -42,6 +42,9 @@ class Category(db.Model):
 
 class Course(db.Model):
     __tablename__ = "courses"
+    __table_args__ = (
+        db.Index('idx_courses_status_deleted', 'status', 'is_deleted'),
+    )
     id = db.Column(db.String(36), primary_key=True, default=new_uuid)
     title = db.Column(db.String(255), nullable=False)
     short_description = db.Column(db.String(500), default="", nullable=False)
@@ -111,6 +114,9 @@ class Enrollment(db.Model):
 
 class LearningLog(db.Model):
     __tablename__ = "learning_logs"
+    __table_args__ = (
+        db.Index('idx_learning_logs_user_action', 'user_id', 'action_type'),
+    )
     log_id = db.Column(db.String(36), primary_key=True, default=new_uuid)
     user_id = db.Column(db.String(36), db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     lesson_id = db.Column(db.String(36), db.ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False, index=True)

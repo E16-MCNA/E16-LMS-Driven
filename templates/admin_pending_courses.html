@@ -28,7 +28,7 @@
           <div style="display: flex; gap: 12px; align-items: center;">
             <a href="{{ url_for('student.learn', course_id=course.id) }}" target="_blank" class="btn btn-outline btn-sm">Xem Preview</a>
             
-            <form action="{{ url_for('admin.approve_course', course_id=course.id) }}" method="post" onsubmit="return confirm('Phê duyệt khóa học này?')">
+            <form action="{{ url_for('admin.approve_course', course_id=course.id) }}" method="post" onsubmit="return confirmAction(this, 'Phe duyet khoa hoc', 'Khoa hoc se duoc xuat ban va hien thi tren Catalog cho hoc vien. Xac nhan phe duyet?', '✅')">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-primary btn-sm">Duyệt xuất bản</button>
             </form>

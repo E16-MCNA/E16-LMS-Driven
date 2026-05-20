@@ -15,20 +15,26 @@
       </div>
     </header>
 
-    <div style="margin-bottom: 24px; display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
+    <div style="margin-bottom: 24px; display: flex; justify-content: flex-end; align-items: center; gap: 16px;">
       {% if selected_lesson.id not in completed_ids %}
-        <span id="lesson-timer" style="font-size: 0.82rem; color: var(--warning); font-weight: 600; display: flex; align-items: center; gap: 6px;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 3.5a.5.5 0 0 0-1 0V8a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 7.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/></svg>
-          <span id="timer-text">Cần ở lại ít nhất 1:30</span>
-        </span>
+        <div class="timer-ring-container" id="lesson-timer">
+          <div class="timer-ring">
+            <svg viewBox="0 0 44 44">
+              <circle class="timer-ring-bg" cx="22" cy="22" r="20"/>
+              <circle class="timer-ring-progress" id="timerProgress" cx="22" cy="22" r="20"/>
+            </svg>
+            <div class="timer-ring-text" id="timerText">1:30</div>
+          </div>
+          <span id="timerLabel" style="font-size: 0.85rem; color: var(--warning); font-weight: 600;">Vui long hoc it nhat 1:30</span>
+        </div>
         <form action="{{ url_for('student.mark_complete', course_id=course.id, lesson_id=selected_lesson.id) }}" method="post">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" id="btn-complete" class="btn btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;">
-            ⏳ Đánh dấu hoàn thành
+          <button type="submit" id="btn-complete" class="btn btn-primary" disabled style="opacity: 0.5; cursor: not-allowed; transition: all 0.5s ease;">
+            ⏳ Dang cho...
           </button>
         </form>
       {% else %}
-        <span class="btn btn-outline btn-sm" style="color: var(--success); cursor: default; border-color: var(--success);">✓ Đã hoàn thành</span>
+        <span class="btn btn-outline btn-sm" style="color: var(--success); cursor: default; border-color: var(--success);">✓ Da hoan thanh</span>
       {% endif %}
     </div>
 
@@ -127,27 +133,41 @@
 <script nonce="{{ csp_nonce() }}">
   (function() {
     const REQUIRED_SECONDS = 90;
+    const CIRCUMFERENCE = 2 * Math.PI * 20; // r=20
     let remaining = REQUIRED_SECONDS;
     const btn = document.getElementById('btn-complete');
-    const timerEl = document.getElementById('lesson-timer');
-    const timerText = document.getElementById('timer-text');
+    const progress = document.getElementById('timerProgress');
+    const timerText = document.getElementById('timerText');
+    const timerLabel = document.getElementById('timerLabel');
     
-    if (!btn || !timerEl) return;
+    if (!btn || !progress) return;
 
     const interval = setInterval(() => {
       remaining--;
+      const elapsed = REQUIRED_SECONDS - remaining;
+      const pct = elapsed / REQUIRED_SECONDS;
+      
+      // Update ring progress (stroke-dashoffset goes from CIRCUMFERENCE to 0)
+      progress.style.strokeDashoffset = CIRCUMFERENCE * (1 - pct);
+      
       if (remaining <= 0) {
         clearInterval(interval);
+        progress.style.strokeDashoffset = '0';
+        progress.classList.add('complete');
         btn.disabled = false;
         btn.style.opacity = '1';
         btn.style.cursor = 'pointer';
-        btn.innerHTML = '✅ Đánh dấu hoàn thành';
-        timerEl.style.color = 'var(--success)';
-        timerText.textContent = 'Đã đủ thời gian!';
+        btn.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.4)';
+        btn.innerHTML = '✅ Danh dau hoan thanh';
+        timerText.textContent = '✓';
+        timerText.style.color = 'var(--success)';
+        timerLabel.textContent = 'Da du thoi gian!';
+        timerLabel.style.color = 'var(--success)';
       } else {
         const m = Math.floor(remaining / 60);
         const s = remaining % 60;
-        timerText.textContent = `Còn ${m}:${s < 10 ? '0' : ''}${s} để mở khóa`;
+        timerText.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+        timerLabel.textContent = 'Con ' + m + ':' + (s < 10 ? '0' : '') + s + ' de mo khoa';
       }
     }, 1000);
   })();

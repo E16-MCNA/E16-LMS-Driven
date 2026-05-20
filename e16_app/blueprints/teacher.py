@@ -151,17 +151,19 @@ def course_students(course_id):
         
     enrollments = db.session.query(Enrollment, User).join(User, User.id == Enrollment.user_id).filter(Enrollment.course_id == course_id).all()
     
-    # Tính toán tiến độ từng học viên
+    # Optimized: single GROUP BY query instead of N queries per student
     from ..models import LearningLog, Lesson
     progress_map = {}
     if course.total_lessons > 0:
+        completed_counts = db.session.query(
+            LearningLog.user_id, func.count(func.distinct(LearningLog.lesson_id))
+        ).join(Lesson, Lesson.id == LearningLog.lesson_id).filter(
+            LearningLog.action_type == "complete",
+            Lesson.course_id == course_id
+        ).group_by(LearningLog.user_id).all()
+        counts_map = {uid: cnt for uid, cnt in completed_counts}
         for en, u in enrollments:
-            completed = db.session.query(LearningLog).join(Lesson, Lesson.id == LearningLog.lesson_id).filter(
-                LearningLog.user_id == u.id,
-                LearningLog.action_type == "complete",
-                Lesson.course_id == course_id
-            ).count()
-            progress_map[u.id] = int((completed / course.total_lessons) * 100)
+            progress_map[u.id] = int((counts_map.get(u.id, 0) / course.total_lessons) * 100)
     else:
         for en, u in enrollments:
             progress_map[u.id] = 0
@@ -625,12 +627,13 @@ def course_analytics(course_id):
     stats_map = {sid: count for sid, count in completion_stats}
     funnel_data = [{"title": ls.title, "count": stats_map.get(ls.id, 0)} for ls in lessons]
         
-    # Quiz averages
+    # Optimized: single GROUP BY query for all quiz averages at once
     quizzes = db.session.query(Quiz).filter_by(course_id=course_id).all()
-    quiz_stats = []
-    for q in quizzes:
-        avg = db.session.query(func.avg(QuizAttempt.score)).filter_by(quiz_id=q.id).scalar() or 0
-        quiz_stats.append({"title": q.title, "avg": round(float(avg), 1)})
+    avg_scores = db.session.query(
+        QuizAttempt.quiz_id, func.avg(QuizAttempt.score)
+    ).join(Quiz).filter(Quiz.course_id == course_id).group_by(QuizAttempt.quiz_id).all()
+    avg_map = {qid: round(float(avg or 0), 1) for qid, avg in avg_scores}
+    quiz_stats = [{"title": q.title, "avg": avg_map.get(q.id, 0)} for q in quizzes]
         
     # Score Distribution (Phổ điểm)
     score_distribution = {"0-20": 0, "21-40": 0, "41-60": 0, "61-80": 0, "81-100": 0}

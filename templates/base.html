@@ -121,5 +121,65 @@
         });
       }, 4000);
     </script>
+
+    <!-- Global Glassmorphism Confirmation Modal -->
+    <div class="confirm-overlay" id="confirmOverlay">
+      <div class="confirm-modal">
+        <div class="confirm-icon" id="confirmIcon">⚠️</div>
+        <div class="confirm-title" id="confirmTitle">Xác nhận hành động</div>
+        <div class="confirm-message" id="confirmMessage">Bạn có chắc chắn muốn thực hiện hành động này?</div>
+        <div class="confirm-actions">
+          <button type="button" class="btn btn-outline btn-sm" id="confirmCancel">Hủy bỏ</button>
+          <button type="button" class="btn btn-danger btn-sm" id="confirmOk">Xác nhận</button>
+        </div>
+      </div>
+    </div>
+
+    <script nonce="{{ csp_nonce() }}">
+      (function() {
+        const overlay = document.getElementById('confirmOverlay');
+        const titleEl = document.getElementById('confirmTitle');
+        const msgEl = document.getElementById('confirmMessage');
+        const iconEl = document.getElementById('confirmIcon');
+        const okBtn = document.getElementById('confirmOk');
+        const cancelBtn = document.getElementById('confirmCancel');
+        let pendingForm = null;
+
+        function showModal(title, message, icon) {
+          titleEl.textContent = title || 'Xac nhan hanh dong';
+          msgEl.textContent = message || 'Ban co chac chan?';
+          iconEl.textContent = icon || '⚠️';
+          overlay.classList.add('active');
+        }
+
+        function hideModal() {
+          overlay.classList.remove('active');
+          pendingForm = null;
+        }
+
+        cancelBtn.addEventListener('click', hideModal);
+        overlay.addEventListener('click', function(e) {
+          if (e.target === overlay) hideModal();
+        });
+        document.addEventListener('keydown', function(e) {
+          if (e.key === 'Escape' && overlay.classList.contains('active')) hideModal();
+        });
+
+        okBtn.addEventListener('click', function() {
+          if (pendingForm) {
+            pendingForm.removeAttribute('data-confirm');
+            pendingForm.requestSubmit ? pendingForm.requestSubmit() : pendingForm.submit();
+          }
+          hideModal();
+        });
+
+        // Global confirmAction function for forms
+        window.confirmAction = function(form, title, message, icon) {
+          pendingForm = form;
+          showModal(title, message, icon);
+          return false; // prevent default form submission
+        };
+      })();
+    </script>
   </body>
 </html>

@@ -74,7 +74,7 @@
               </form>
             {% endif %}
             
-            <form action="{{ url_for('teacher.delete_course', course_id=course.id) }}" method="post" style="display: inline;" onsubmit="return confirm('Xóa toàn bộ khóa học?')">
+            <form action="{{ url_for('teacher.delete_course', course_id=course.id) }}" method="post" style="display: inline;" onsubmit="return confirmAction(this, 'Xoa khoa hoc', 'Khoa hoc se chuyen sang trang thai luu tru (soft-delete). Hoc vien da dang ky van tiep tuc hoc nhung khoa hoc se an khoi Catalog.', '🗑️')">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-danger btn-sm">Xóa</button>
             </form>
