@@ -54,7 +54,7 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     PAYMENT_MODE = os.environ.get("PAYMENT_MODE", "real").lower()
-    RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/0")
+    RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://" if os.environ.get("VERCEL") else "redis://localhost:6379/0")
     
     @classmethod
     def init_app(cls, app):
