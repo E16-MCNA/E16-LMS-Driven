@@ -11,11 +11,11 @@ Werkzeug>=3.1.6
 flask-wtf
 python-dotenv>=1.2.2
 authlib>=1.6.11
-requests>=2.32.3
+requests>=2.33.0
 python-slugify
 psycopg2-binary
 gunicorn>=22.0.0
-pytest
+pytest>=9.0.3
 supabase
 websockets
 Flask-Limiter
