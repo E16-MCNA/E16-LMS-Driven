@@ -136,6 +136,49 @@ def create_app():
                     
                     db.session.commit()
                     app.logger.info("Database auto-seeding completed successfully.")
+
+                if os.environ.get("VERCEL") and os.getenv("E16_SEED_PASSWORD"):
+                    from werkzeug.security import check_password_hash, generate_password_hash
+
+                    seed_password = os.getenv("E16_SEED_PASSWORD")
+                    core_users = [
+                        ("admin@e16.local", "admin"),
+                        ("teacher@e16.local", "teacher"),
+                        ("student@e16.local", "student"),
+                        ("hocvu@e16.local", "hoc_vu"),
+                    ]
+                    core_users.extend((f"student{i}@e16.local", "student") for i in range(1, 6))
+
+                    mutated = False
+                    for email, role in core_users:
+                        user = db.session.query(User).filter_by(email=email).first()
+                        if user is None:
+                            db.session.add(User(
+                                email=email,
+                                password_hash=generate_password_hash(seed_password),
+                                role=role,
+                                is_active=True,
+                                must_change_password=False,
+                            ))
+                            mutated = True
+                            continue
+
+                        if user.role != role:
+                            user.role = role
+                            mutated = True
+                        if not user.is_active:
+                            user.is_active = True
+                            mutated = True
+                        if getattr(user, "must_change_password", False):
+                            user.must_change_password = False
+                            mutated = True
+                        if not check_password_hash(user.password_hash, seed_password):
+                            user.password_hash = generate_password_hash(seed_password)
+                            mutated = True
+
+                    if mutated:
+                        db.session.commit()
+                        app.logger.info("Vercel core demo accounts synchronized from E16_SEED_PASSWORD.")
             except Exception as e:
                 app.logger.error(f"Error during auto-seeding: {str(e)}")
 

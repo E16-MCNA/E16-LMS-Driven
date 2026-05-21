@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 import importlib
 import sqlite3
+from datetime import datetime, timezone
+
+from werkzeug.security import generate_password_hash
 
 
 def test_vercel_engine_options_are_psycopg2_safe(monkeypatch):
@@ -83,6 +86,55 @@ def test_vercel_startup_self_heals_legacy_schema(monkeypatch, tmp_path):
 
         assert {"must_change_password", "created_by", "temp_password_hash"} <= user_columns
         assert {"price", "tags", "level", "reviewed_by", "starts_at", "max_students"} <= course_columns
+    finally:
+        monkeypatch.delenv("VERCEL", raising=False)
+        monkeypatch.setenv("APP_ENV", "testing")
+        importlib.reload(config_module)
+
+
+def test_vercel_startup_syncs_core_demo_account_passwords(monkeypatch, tmp_path):
+    db_path = tmp_path / "existing-users.db"
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("SECRET_KEY", "test-secret")
+    monkeypatch.setenv("E16_SEED_PASSWORD", "new-seed-password")
+
+    import e16_app.config as config_module
+
+    try:
+        importlib.reload(config_module)
+        from e16_app import create_app
+        from e16_app.extensions import db
+        from e16_app.models import User
+
+        app = create_app()
+        with app.app_context():
+            admin = db.session.query(User).filter_by(email="admin@e16.local").first()
+            admin.password_hash = generate_password_hash("old-password")
+            admin.role = "student"
+            admin.is_active = False
+            admin.must_change_password = True
+            admin.created_at = datetime.now(timezone.utc)
+            db.session.commit()
+
+        app = create_app()
+        app.config["WTF_CSRF_ENABLED"] = False
+        client = app.test_client()
+        response = client.post(
+            "/auth/login",
+            data={"email": "admin@e16.local", "password": "new-seed-password"},
+            base_url="https://localhost",
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 302
+        assert response.headers["Location"].endswith("/auth/")
+        with app.app_context():
+            admin = db.session.query(User).filter_by(email="admin@e16.local").first()
+            assert admin.role == "admin"
+            assert admin.is_active is True
+            assert admin.must_change_password is False
     finally:
         monkeypatch.delenv("VERCEL", raising=False)
         monkeypatch.setenv("APP_ENV", "testing")
