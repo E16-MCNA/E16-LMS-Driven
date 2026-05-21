@@ -38,19 +38,19 @@ def dashboard():
     user_growth = db.session.query(
         func.date(User.created_at).label('date'),
         func.count(User.id).label('count')
-    ).filter(User.created_at >= start_date).group_by('date').all()
+    ).filter(User.created_at >= start_date).group_by(func.date(User.created_at)).all()
     
     # Enrollment Trend (Bar Chart)
     enroll_trend = db.session.query(
         func.date(Enrollment.enrolled_at).label('date'),
         func.count(Enrollment.id).label('count')
-    ).filter(Enrollment.enrolled_at >= start_date).group_by('date').all()
+    ).filter(Enrollment.enrolled_at >= start_date).group_by(func.date(Enrollment.enrolled_at)).all()
     
     # Top 5 Courses (Horizontal Bar)
     top_courses = db.session.query(
         Course.title,
         func.count(Enrollment.id).label('enroll_count')
-    ).join(Enrollment).filter(Course.is_deleted == False).group_by(Course.id).order_by(func.count(Enrollment.id).desc()).limit(5).all()
+    ).join(Enrollment).filter(Course.is_deleted == False).group_by(Course.id, Course.title).order_by(func.count(Enrollment.id).desc()).limit(5).all()
     
     # Level Distribution (Doughnut Chart)
     level_dist = db.session.query(
