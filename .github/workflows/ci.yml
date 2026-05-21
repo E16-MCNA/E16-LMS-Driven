@@ -2,9 +2,9 @@ name: E16 LMS CI & Supply-Chain Security
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, develop ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, develop ]
 
 permissions:
   contents: read
