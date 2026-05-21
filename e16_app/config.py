@@ -14,20 +14,34 @@ class Config:
     
     # Database
     db_url = os.environ.get("DATABASE_URL", "sqlite:///e16.db")
-    if db_url.startswith("postgres://"):
-        db_url = db_url.replace("postgres://", "postgresql://", 1)
-    
-    # Dynamically URL-encode password to handle special characters safely
-    if db_url.startswith("postgresql://") and "@" in db_url:
+    if db_url.startswith("postgresql://") or db_url.startswith("postgres://"):
         try:
             import urllib.parse
-            credentials, host_part = db_url.rsplit("@", 1)
-            protocol, user_pass = credentials.split("://", 1)
-            if ":" in user_pass:
-                username, password = user_pass.split(":", 1)
-                unquoted_password = urllib.parse.unquote(password)
-                encoded_password = urllib.parse.quote(unquoted_password, safe="")
-                db_url = f"{protocol}://{username}:{encoded_password}@{host_part}"
+            # Standardize protocol
+            if db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql://", 1)
+                
+            # Parse the URL
+            parsed = urllib.parse.urlparse(db_url)
+            
+            # Reconstruct the connection string credentials safely (encoding password)
+            netloc = parsed.netloc
+            if "@" in netloc:
+                credentials, host_part = netloc.rsplit("@", 1)
+                if ":" in credentials:
+                    username, password = credentials.split(":", 1)
+                    unquoted_password = urllib.parse.unquote(password)
+                    encoded_password = urllib.parse.quote(unquoted_password, safe="")
+                    netloc = f"{username}:{encoded_password}@{host_part}"
+            
+            # Parse and clean query parameters (psycopg2 crashes on non-libpq options like pgbouncer)
+            query_params = urllib.parse.parse_qsl(parsed.query)
+            cleaned_params = [(k, v) for k, v in query_params if k.lower() != "pgbouncer"]
+            new_query = urllib.parse.urlencode(cleaned_params)
+            
+            # Rebuild URL
+            parsed = parsed._replace(netloc=netloc, query=new_query)
+            db_url = urllib.parse.urlunparse(parsed)
         except Exception:
             pass
 
@@ -70,6 +84,16 @@ class ProductionConfig(Config):
     DEBUG = False
     PAYMENT_MODE = os.environ.get("PAYMENT_MODE", "real").lower()
     RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://" if os.environ.get("VERCEL") else "redis://localhost:6379/0")
+    
+    # Configure SQLAlchemy to support PgBouncer transaction pooling on Vercel
+    if os.environ.get("VERCEL"):
+        from sqlalchemy.pool import NullPool
+        SQLALCHEMY_ENGINE_OPTIONS = {
+            "poolclass": NullPool,
+            "connect_args": {
+                "prepare_threshold": None
+            }
+        }
     
     @classmethod
     def init_app(cls, app):
