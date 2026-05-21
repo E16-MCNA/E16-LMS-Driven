@@ -3,11 +3,11 @@
 <header class="top-header">
   <div>
     <h1>Tài khoản đã tạo</h1>
-    <p>Danh sách tài khoản do bạn tạo qua hệ thống.</p>
+    <p>Danh sách tài khoản do Học vụ tạo qua hệ thống.</p>
   </div>
   <div class="actions">
-    <a href="{{ url_for('hoc_vu.create_account') }}" class="btn btn-primary">➕ Tạo mới</a>
-    <a href="{{ url_for('hoc_vu.import_accounts_view') }}" class="btn btn-outline">📄 Import CSV</a>
+    <a href="{{ url_for('hoc_vu.create_account') }}" class="btn btn-primary">Tạo mới</a>
+    <a href="{{ url_for('hoc_vu.import_accounts_view') }}" class="btn btn-outline">Import CSV</a>
   </div>
 </header>
 
@@ -22,6 +22,7 @@
         <th style="padding: 12px;">Ngày tạo</th>
         <th style="padding: 12px;">Trạng thái</th>
         <th style="padding: 12px;">Đổi MK</th>
+        <th style="padding: 12px;">Mật khẩu tạm</th>
       </tr>
     </thead>
     <tbody>
@@ -31,7 +32,7 @@
         <td style="padding: 12px;">
           <span class="badge" style="background: rgba(59, 130, 246, 0.1); color: var(--primary);">{{ u.role }}</span>
         </td>
-        <td style="padding: 12px; color: var(--text-muted);">{{ u.phone or '—' }}</td>
+        <td style="padding: 12px; color: var(--text-muted);">{{ u.phone or '-' }}</td>
         <td style="padding: 12px; color: var(--text-muted);">{{ u.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
         <td style="padding: 12px;">
           {% if u.is_active %}
@@ -45,6 +46,16 @@
             <span class="badge" style="background: rgba(251, 191, 36, 0.1); color: #f59e0b;">Chờ</span>
           {% else %}
             <span class="badge" style="background: rgba(34, 197, 94, 0.1); color: var(--success);">Xong</span>
+          {% endif %}
+        </td>
+        <td style="padding: 12px;">
+          {% if u.must_change_password %}
+            <form action="{{ url_for('hoc_vu.reset_temp_password', user_id=u.id) }}" method="post" style="margin: 0;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-outline btn-sm">Cấp lại</button>
+            </form>
+          {% else %}
+            <span style="color: var(--text-muted);">-</span>
           {% endif %}
         </td>
       </tr>
@@ -61,7 +72,7 @@
     {% if pagination.has_prev %}
       <a class="btn btn-outline btn-sm" href="{{ url_for('hoc_vu.list_accounts', page=pagination.page - 1) }}">Trước</a>
     {% endif %}
-    <span class="badge" style="background: rgba(255,255,255,0.1); color: var(--text-muted);">Trang {{ pagination.page }}/{{ pagination.pages }} · {{ pagination.total }} tài khoản</span>
+    <span class="badge" style="background: rgba(255,255,255,0.1); color: var(--text-muted);">Trang {{ pagination.page }}/{{ pagination.pages }} - {{ pagination.total }} tài khoản</span>
     {% if pagination.has_next %}
       <a class="btn btn-outline btn-sm" href="{{ url_for('hoc_vu.list_accounts', page=pagination.page + 1) }}">Sau</a>
     {% endif %}

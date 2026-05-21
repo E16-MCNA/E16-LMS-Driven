@@ -203,6 +203,38 @@ def list_accounts():
 
 # ── CSV import ───────────────────────────────────────────
 
+@bp.post("/accounts/<user_id>/reset-temp-password")
+@login_required
+@role_required("hoc_vu", "admin")
+def reset_temp_password(user_id):
+    user = db.session.get(User, user_id)
+    if not user or user.created_by is None:
+        flash("Khong tim thay tai khoan do Hoc vu tao.", "error")
+        return redirect(url_for("hoc_vu.list_accounts"))
+
+    if user.role not in CREATABLE_ROLES:
+        flash("Khong duoc cap lai mat khau tam cho role nay.", "error")
+        return redirect(url_for("hoc_vu.list_accounts"))
+
+    temp_pass = _gen_temp_password()
+    password_hash = generate_password_hash(temp_pass)
+    user.password_hash = password_hash
+    user.temp_password_hash = password_hash
+    user.must_change_password = True
+    user.is_active = True
+    db.session.commit()
+
+    _send_welcome_email(user.email, temp_pass, user.role)
+    log_action("temp_password_reset_by_hocvu", "User", user.id, {
+        "email": user.email,
+        "role": user.role,
+        "created_by": current_user.email,
+    })
+
+    flash(f"Da cap lai mat khau tam cho {user.email}: {temp_pass}", "success")
+    return redirect(url_for("hoc_vu.list_accounts"))
+
+
 @bp.route("/accounts/import", methods=["GET"])
 @login_required
 @role_required("hoc_vu", "admin")

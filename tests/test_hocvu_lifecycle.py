@@ -221,6 +221,37 @@ class TestHocVuAccountCreation:
             assert user.role == "teacher"
 
     @pytest.mark.integration
+    def test_reset_temp_password_for_created_account(self, client, app, monkeypatch):
+        """Hoc vu can issue a new temporary password when the first one is lost."""
+        hv_id = _mk(app, "hv@test.com", "hoc_vu")
+        _login(client, "hv@test.com")
+
+        with app.app_context():
+            user = User(
+                email="frontdesk@test.com",
+                password_hash=generate_password_hash("oldtemp123"),
+                role="le_tan",
+                must_change_password=True,
+                created_by=hv_id,
+                temp_password_hash=generate_password_hash("oldtemp123"),
+            )
+            db.session.add(user)
+            db.session.commit()
+            user_id = user.id
+
+        monkeypatch.setattr("e16_app.blueprints.hoc_vu._gen_temp_password", lambda length=10: "newtemp123")
+        response = client.post(f"/hoc-vu/accounts/{user_id}/reset-temp-password", follow_redirects=True)
+
+        assert response.status_code == 200
+        assert b"newtemp123" in response.data
+        with app.app_context():
+            user = db.session.get(User, user_id)
+            assert user.must_change_password is True
+            assert user.is_active is True
+            assert check_password_hash(user.password_hash, "newtemp123")
+            assert check_password_hash(user.temp_password_hash, "newtemp123")
+
+    @pytest.mark.integration
     def test_cannot_create_admin_account(self, client, app):
         """Học vụ should NOT be able to create admin accounts."""
         _mk(app, "hv@test.com", "hoc_vu")
