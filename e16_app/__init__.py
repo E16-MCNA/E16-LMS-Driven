@@ -36,8 +36,8 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
     
-    # Automatically create missing tables and seed basic settings in development
-    if app_env == "development":
+    # Automatically create missing tables and seed basic settings in development/Vercel
+    if app_env == "development" or os.environ.get("VERCEL"):
         with app.app_context():
             db.create_all()
             # Self-healing column migration for price column
@@ -83,18 +83,75 @@ def create_app():
                         db.session.commit()
                     except Exception as ex:
                         app.logger.warning(f"Self-healing {tbl}.{col} migration failed: {str(ex)}")
-            from .models import SystemSetting
+            
+            # Auto-seed initial users, categories, and settings if DB is completely empty (no users)
+            from .models import User, Category, SystemSetting
+            try:
+                user_count = db.session.query(User).count()
+                if user_count == 0:
+                    app.logger.info("Database is empty. Automatically seeding initial categories, settings, and users...")
+                    # Seed Categories
+                    cats = [
+                        {"name": "Công nghệ thông tin", "slug": "it", "icon": "💻", "sort_order": 1},
+                        {"name": "Kinh doanh & Khởi nghiệp", "slug": "business", "icon": "📈", "sort_order": 2},
+                        {"name": "Ngoại ngữ", "slug": "languages", "icon": "🌍", "sort_order": 3},
+                        {"name": "Thiết kế đồ họa", "slug": "design", "icon": "🎨", "sort_order": 4}
+                    ]
+                    for c_data in cats:
+                        if not db.session.query(Category).filter_by(slug=c_data["slug"]).first():
+                            db.session.add(Category(**c_data))
+                            
+                    # Seed Settings
+                    settings = [
+                        {"key": "site_name", "value": "E16 LMS", "description": "Tên nền tảng hiển thị trên tiêu đề và sidebar."},
+                        {"key": "site_logo_url", "value": "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop", "description": "URL ảnh logo của hệ thống."},
+                        {"key": "allow_registration", "value": "True", "description": "Cho phép người dùng tự đăng ký tài khoản."},
+                        {"key": "require_course_approval", "value": "True", "description": "Yêu cầu admin duyệt khóa học trước khi xuất bản."}
+                    ]
+                    for s_data in settings:
+                        if not db.session.query(SystemSetting).filter_by(key=s_data["key"]).first():
+                            db.session.add(SystemSetting(**s_data))
+                            
+                    # Seed Users
+                    from werkzeug.security import generate_password_hash
+                    seed_password = os.getenv("E16_SEED_PASSWORD") or "demo-password"
+                    users = [
+                        {"email": "admin@e16.local", "password_hash": generate_password_hash(seed_password), "role": "admin", "must_change_password": False},
+                        {"email": "teacher@e16.local", "password_hash": generate_password_hash(seed_password), "role": "teacher", "must_change_password": False},
+                        {"email": "student@e16.local", "password_hash": generate_password_hash(seed_password), "role": "student", "must_change_password": False},
+                        {"email": "hocvu@e16.local", "password_hash": generate_password_hash(seed_password), "role": "hoc_vu", "must_change_password": False},
+                    ]
+                    for u_data in users:
+                        if not db.session.query(User).filter_by(email=u_data["email"]).first():
+                            db.session.add(User(**u_data))
+                            
+                    for i in range(1, 6):
+                        email = f"student{i}@e16.local"
+                        if not db.session.query(User).filter_by(email=email).first():
+                            db.session.add(User(email=email, password_hash=generate_password_hash(seed_password), role="student"))
+                    
+                    db.session.commit()
+                    app.logger.info("Database auto-seeding completed successfully.")
+            except Exception as e:
+                app.logger.error(f"Error during auto-seeding: {str(e)}")
+
             default_settings = [
                 {"key": "site_name", "value": "E16 LMS", "description": "Tên hệ thống"},
                 {"key": "site_logo_url", "value": "", "description": "URL logo hệ thống"}
             ]
             mutated = False
             for s_data in default_settings:
-                if not db.session.query(SystemSetting).filter_by(key=s_data["key"]).first():
-                    db.session.add(SystemSetting(**s_data))
-                    mutated = True
+                try:
+                    if not db.session.query(SystemSetting).filter_by(key=s_data["key"]).first():
+                        db.session.add(SystemSetting(**s_data))
+                        mutated = True
+                except Exception:
+                    pass
             if mutated:
-                db.session.commit()
+                try:
+                    db.session.commit()
+                except Exception:
+                    pass
 
     csrf.init_app(app)
     login_manager.init_app(app)
@@ -203,8 +260,11 @@ def create_app():
             "unread_notifs_count": 0
         }
         if current_user.is_authenticated:
-            from .models import Notification
-            data["unread_notifs_count"] = db.session.query(Notification).filter_by(user_id=current_user.id, is_read=False).count()
+            try:
+                from .models import Notification
+                data["unread_notifs_count"] = db.session.query(Notification).filter_by(user_id=current_user.id, is_read=False).count()
+            except Exception:
+                pass
         return data
 
     # --- Structured JSON Logging & Request ID correlation ---

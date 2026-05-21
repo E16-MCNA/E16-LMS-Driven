@@ -16,6 +16,21 @@ class Config:
     db_url = os.environ.get("DATABASE_URL", "sqlite:///e16.db")
     if db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql://", 1)
+    
+    # Dynamically URL-encode password to handle special characters safely
+    if db_url.startswith("postgresql://") and "@" in db_url:
+        try:
+            import urllib.parse
+            credentials, host_part = db_url.rsplit("@", 1)
+            protocol, user_pass = credentials.split("://", 1)
+            if ":" in user_pass:
+                username, password = user_pass.split(":", 1)
+                unquoted_password = urllib.parse.unquote(password)
+                encoded_password = urllib.parse.quote(unquoted_password, safe="")
+                db_url = f"{protocol}://{username}:{encoded_password}@{host_part}"
+        except Exception:
+            pass
+
     SQLALCHEMY_DATABASE_URI = db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     

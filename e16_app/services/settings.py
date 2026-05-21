@@ -11,10 +11,13 @@ def get_setting(key, default=None):
     if key in _settings_cache:
         return _settings_cache[key]
         
-    setting = db.session.query(SystemSetting).filter_by(key=key).first()
-    if setting:
-        _settings_cache[key] = setting.value
-        return setting.value
+    try:
+        setting = db.session.query(SystemSetting).filter_by(key=key).first()
+        if setting:
+            _settings_cache[key] = setting.value
+            return setting.value
+    except Exception:
+        pass
     return default
 
 def flush_settings_cache():

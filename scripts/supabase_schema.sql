@@ -1,254 +1,306 @@
--- Supabase schema migration for E16 LMS.
--- Run this in the Supabase SQL Editor before syncing data from local SQLite.
--- The script is additive: it creates missing tables and adds missing columns.
-
-create table if not exists public.users (
-  id text primary key,
-  email text not null unique,
-  password_hash text not null,
-  phone text,
-  is_active boolean not null default true,
-  role text not null,
-  created_at timestamptz not null default now(),
-  last_login timestamptz,
-  login_count integer not null default 0,
-  reset_token text unique,
-  reset_token_expiry timestamptz
+CREATE TABLE background_jobs (
+	id VARCHAR(36) NOT NULL, 
+	task_name VARCHAR(100) NOT NULL, 
+	payload TEXT NOT NULL, 
+	status VARCHAR(20) NOT NULL, 
+	attempts INTEGER NOT NULL, 
+	max_attempts INTEGER NOT NULL, 
+	error_message TEXT, 
+	created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+	started_at TIMESTAMP WITHOUT TIME ZONE, 
+	completed_at TIMESTAMP WITHOUT TIME ZONE, 
+	CONSTRAINT pk_background_jobs PRIMARY KEY (id)
 );
 
-create table if not exists public.categories (
-  id text primary key,
-  name text not null,
-  slug text not null unique,
-  description text default '',
-  icon text default '',
-  sort_order integer default 0
+CREATE TABLE categories (
+	id VARCHAR(36) NOT NULL, 
+	name VARCHAR(100) NOT NULL, 
+	slug VARCHAR(100) NOT NULL, 
+	description VARCHAR(500), 
+	icon VARCHAR(50), 
+	sort_order INTEGER, 
+	CONSTRAINT pk_categories PRIMARY KEY (id), 
+	CONSTRAINT uq_categories_slug UNIQUE (slug)
 );
 
-create table if not exists public.courses (
-  id text primary key,
-  title text not null,
-  short_description text not null default '',
-  description text not null default '',
-  cover_image_url text not null default '',
-  total_lessons integer not null default 0,
-  status text not null default 'draft',
-  is_deleted boolean not null default false,
-  category_id text references public.categories(id) on delete set null,
-  teacher_id text not null references public.users(id) on delete cascade,
-  rejection_note text,
-  submitted_at timestamptz,
-  published_at timestamptz,
-  price integer not null default 250000,
-  tags text not null default '',
-  level text not null default '',
-  created_at timestamptz not null default now()
+CREATE TABLE system_settings (
+	id VARCHAR(36) NOT NULL, 
+	key VARCHAR(100) NOT NULL, 
+	value TEXT, 
+	description VARCHAR(255), 
+	updated_at TIMESTAMP WITHOUT TIME ZONE, 
+	CONSTRAINT pk_system_settings PRIMARY KEY (id), 
+	CONSTRAINT uq_system_settings_key UNIQUE (key)
 );
 
-create table if not exists public.system_settings (
-  id text primary key,
-  "key" text not null unique,
-  "value" text,
-  description text,
-  updated_at timestamptz default now()
+CREATE TABLE users (
+	id VARCHAR(36) NOT NULL, 
+	email VARCHAR(255) NOT NULL, 
+	password_hash VARCHAR(255) NOT NULL, 
+	phone VARCHAR(20), 
+	is_active BOOLEAN NOT NULL, 
+	role VARCHAR(20) NOT NULL, 
+	created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+	last_login TIMESTAMP WITHOUT TIME ZONE, 
+	login_count INTEGER NOT NULL, 
+	reset_token VARCHAR(100), 
+	reset_token_expiry TIMESTAMP WITHOUT TIME ZONE, 
+	must_change_password BOOLEAN NOT NULL, 
+	created_by VARCHAR(36), 
+	temp_password_hash VARCHAR(255), 
+	CONSTRAINT pk_users PRIMARY KEY (id), 
+	CONSTRAINT uq_users_email UNIQUE (email), 
+	CONSTRAINT uq_users_reset_token UNIQUE (reset_token), 
+	CONSTRAINT fk_users_created_by_users FOREIGN KEY(created_by) REFERENCES users (id)
 );
 
-create table if not exists public.audit_logs (
-  id text primary key,
-  actor_id text references public.users(id) on delete set null,
-  action text not null,
-  target_type text,
-  target_id text,
-  detail text,
-  ip_address text,
-  created_at timestamptz default now()
+CREATE TABLE audit_logs (
+	id VARCHAR(36) NOT NULL, 
+	actor_id VARCHAR(36), 
+	action VARCHAR(100) NOT NULL, 
+	target_type VARCHAR(50), 
+	target_id VARCHAR(36), 
+	detail TEXT, 
+	ip_address VARCHAR(45), 
+	created_at TIMESTAMP WITHOUT TIME ZONE, 
+	CONSTRAINT pk_audit_logs PRIMARY KEY (id), 
+	CONSTRAINT fk_audit_logs_actor_id_users FOREIGN KEY(actor_id) REFERENCES users (id)
 );
 
-create table if not exists public.lessons (
-  id text primary key,
-  course_id text not null references public.courses(id) on delete cascade,
-  title text not null,
-  video_url text not null default '',
-  document_url text not null default '',
-  sequence_order integer not null,
-  created_at timestamptz not null default now()
+CREATE TABLE content_reports (
+	id VARCHAR(36) NOT NULL, 
+	reporter_id VARCHAR(36) NOT NULL, 
+	target_type VARCHAR(20) NOT NULL, 
+	target_id VARCHAR(36) NOT NULL, 
+	reason VARCHAR(255) NOT NULL, 
+	detail TEXT, 
+	status VARCHAR(20) NOT NULL, 
+	created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+	resolved_at TIMESTAMP WITHOUT TIME ZONE, 
+	resolved_by VARCHAR(36), 
+	action_taken VARCHAR(50), 
+	CONSTRAINT pk_content_reports PRIMARY KEY (id), 
+	CONSTRAINT fk_content_reports_reporter_id_users FOREIGN KEY(reporter_id) REFERENCES users (id) ON DELETE CASCADE, 
+	CONSTRAINT fk_content_reports_resolved_by_users FOREIGN KEY(resolved_by) REFERENCES users (id) ON DELETE SET NULL
 );
 
-create table if not exists public.enrollments (
-  id text primary key,
-  user_id text not null references public.users(id) on delete cascade,
-  course_id text not null references public.courses(id) on delete cascade,
-  enrolled_at timestamptz not null default now(),
-  status text not null default 'active',
-  constraint uq_enrollments_user_course unique (user_id, course_id)
+CREATE TABLE courses (
+	id VARCHAR(36) NOT NULL, 
+	title VARCHAR(255) NOT NULL, 
+	short_description VARCHAR(500) NOT NULL, 
+	description TEXT NOT NULL, 
+	cover_image_url VARCHAR(500) NOT NULL, 
+	total_lessons INTEGER NOT NULL, 
+	status VARCHAR(20) NOT NULL, 
+	is_deleted BOOLEAN NOT NULL, 
+	category_id VARCHAR(36), 
+	teacher_id VARCHAR(36) NOT NULL, 
+	rejection_note TEXT, 
+	submitted_at TIMESTAMP WITHOUT TIME ZONE, 
+	published_at TIMESTAMP WITHOUT TIME ZONE, 
+	price INTEGER NOT NULL, 
+	tags VARCHAR(500) NOT NULL, 
+	level VARCHAR(20) NOT NULL, 
+	created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+	reviewed_by VARCHAR(36), 
+	reviewed_at TIMESTAMP WITHOUT TIME ZONE, 
+	review_note TEXT, 
+	starts_at TIMESTAMP WITHOUT TIME ZONE, 
+	ends_at TIMESTAMP WITHOUT TIME ZONE, 
+	enrollment_deadline TIMESTAMP WITHOUT TIME ZONE, 
+	max_students INTEGER, 
+	CONSTRAINT pk_courses PRIMARY KEY (id), 
+	CONSTRAINT fk_courses_category_id_categories FOREIGN KEY(category_id) REFERENCES categories (id), 
+	CONSTRAINT fk_courses_teacher_id_users FOREIGN KEY(teacher_id) REFERENCES users (id), 
+	CONSTRAINT fk_courses_reviewed_by_users FOREIGN KEY(reviewed_by) REFERENCES users (id)
 );
 
-create table if not exists public.learning_logs (
-  log_id text primary key,
-  user_id text not null references public.users(id) on delete cascade,
-  lesson_id text not null references public.lessons(id) on delete cascade,
-  action_type text not null,
-  timestamp timestamptz not null default now()
+CREATE TABLE notifications (
+	id VARCHAR(36) NOT NULL, 
+	user_id VARCHAR(36) NOT NULL, 
+	type VARCHAR(50) NOT NULL, 
+	message VARCHAR(500) NOT NULL, 
+	link VARCHAR(500), 
+	is_read BOOLEAN, 
+	created_at TIMESTAMP WITHOUT TIME ZONE, 
+	CONSTRAINT pk_notifications PRIMARY KEY (id), 
+	CONSTRAINT fk_notifications_user_id_users FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
-create table if not exists public.quizzes (
-  id text primary key,
-  course_id text not null references public.courses(id) on delete cascade,
-  title text not null,
-  pass_score integer default 80,
-  max_attempts integer default 3,
-  time_limit integer,
-  random_question_count integer default 0,
-  due_date timestamptz,
-  is_published boolean default false,
-  created_at timestamptz default now()
+CREATE TABLE announcements (
+	id VARCHAR(36) NOT NULL, 
+	course_id VARCHAR(36) NOT NULL, 
+	author_id VARCHAR(36) NOT NULL, 
+	title VARCHAR(255) NOT NULL, 
+	body TEXT NOT NULL, 
+	is_pinned BOOLEAN, 
+	created_at TIMESTAMP WITHOUT TIME ZONE, 
+	CONSTRAINT pk_announcements PRIMARY KEY (id), 
+	CONSTRAINT fk_announcements_course_id_courses FOREIGN KEY(course_id) REFERENCES courses (id) ON DELETE CASCADE, 
+	CONSTRAINT fk_announcements_author_id_users FOREIGN KEY(author_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
-create table if not exists public.questions (
-  id text primary key,
-  quiz_id text not null references public.quizzes(id) on delete cascade,
-  text text not null,
-  q_type text default 'mcq',
-  sequence_order integer default 0
+CREATE TABLE assignments (
+	id VARCHAR(36) NOT NULL, 
+	course_id VARCHAR(36) NOT NULL, 
+	title VARCHAR(255) NOT NULL, 
+	description TEXT NOT NULL, 
+	deadline TIMESTAMP WITHOUT TIME ZONE, 
+	allow_file BOOLEAN, 
+	allow_text BOOLEAN, 
+	created_at TIMESTAMP WITHOUT TIME ZONE, 
+	CONSTRAINT pk_assignments PRIMARY KEY (id), 
+	CONSTRAINT fk_assignments_course_id_courses FOREIGN KEY(course_id) REFERENCES courses (id) ON DELETE CASCADE
 );
 
-create table if not exists public.choices (
-  id text primary key,
-  question_id text not null references public.questions(id) on delete cascade,
-  text text not null,
-  is_correct boolean default false
+CREATE TABLE certificates (
+	id VARCHAR(36) NOT NULL, 
+	user_id VARCHAR(36) NOT NULL, 
+	course_id VARCHAR(36) NOT NULL, 
+	cert_code VARCHAR(100), 
+	issued_at TIMESTAMP WITHOUT TIME ZONE, 
+	CONSTRAINT pk_certificates PRIMARY KEY (id), 
+	CONSTRAINT uq_certificates_user_course UNIQUE (user_id, course_id), 
+	CONSTRAINT fk_certificates_user_id_users FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE, 
+	CONSTRAINT fk_certificates_course_id_courses FOREIGN KEY(course_id) REFERENCES courses (id) ON DELETE CASCADE, 
+	CONSTRAINT uq_certificates_cert_code UNIQUE (cert_code)
 );
 
-create table if not exists public.quiz_attempts (
-  id text primary key,
-  quiz_id text not null references public.quizzes(id) on delete cascade,
-  user_id text not null references public.users(id) on delete cascade,
-  score integer,
-  passed boolean,
-  attempted_at timestamptz default now(),
-  completed_at timestamptz
+CREATE TABLE enrollments (
+	id VARCHAR(36) NOT NULL, 
+	user_id VARCHAR(36) NOT NULL, 
+	course_id VARCHAR(36) NOT NULL, 
+	enrolled_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+	status VARCHAR(20) NOT NULL, 
+	CONSTRAINT pk_enrollments PRIMARY KEY (id), 
+	CONSTRAINT uq_enrollments_user_course UNIQUE (user_id, course_id), 
+	CONSTRAINT fk_enrollments_user_id_users FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE, 
+	CONSTRAINT fk_enrollments_course_id_courses FOREIGN KEY(course_id) REFERENCES courses (id) ON DELETE CASCADE
 );
 
-create table if not exists public.quiz_answers (
-  id text primary key,
-  attempt_id text not null references public.quiz_attempts(id) on delete cascade,
-  question_id text not null references public.questions(id) on delete cascade,
-  choice_id text references public.choices(id) on delete cascade,
-  text_answer text
+CREATE TABLE forum_threads (
+	id VARCHAR(36) NOT NULL, 
+	course_id VARCHAR(36) NOT NULL, 
+	author_id VARCHAR(36) NOT NULL, 
+	title VARCHAR(255) NOT NULL, 
+	body TEXT NOT NULL, 
+	is_pinned BOOLEAN, 
+	is_hidden BOOLEAN NOT NULL, 
+	created_at TIMESTAMP WITHOUT TIME ZONE, 
+	CONSTRAINT pk_forum_threads PRIMARY KEY (id), 
+	CONSTRAINT fk_forum_threads_course_id_courses FOREIGN KEY(course_id) REFERENCES courses (id) ON DELETE CASCADE, 
+	CONSTRAINT fk_forum_threads_author_id_users FOREIGN KEY(author_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
-create table if not exists public.assignments (
-  id text primary key,
-  course_id text not null references public.courses(id) on delete cascade,
-  title text not null,
-  description text not null,
-  deadline timestamptz,
-  allow_file boolean default true,
-  allow_text boolean default true,
-  created_at timestamptz default now()
+CREATE TABLE lessons (
+	id VARCHAR(36) NOT NULL, 
+	course_id VARCHAR(36) NOT NULL, 
+	title VARCHAR(255) NOT NULL, 
+	video_url VARCHAR(500) NOT NULL, 
+	document_url VARCHAR(500) NOT NULL, 
+	sequence_order INTEGER NOT NULL, 
+	created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+	CONSTRAINT pk_lessons PRIMARY KEY (id), 
+	CONSTRAINT fk_lessons_course_id_courses FOREIGN KEY(course_id) REFERENCES courses (id) ON DELETE CASCADE
 );
 
-create table if not exists public.submissions (
-  id text primary key,
-  assignment_id text not null references public.assignments(id) on delete cascade,
-  user_id text not null references public.users(id) on delete cascade,
-  text_content text,
-  file_path text,
-  submitted_at timestamptz default now(),
-  status text default 'pending',
-  score integer,
-  feedback text,
-  graded_at timestamptz,
-  graded_by text references public.users(id) on delete set null,
-  constraint uq_submissions_user_assignment unique (user_id, assignment_id)
+CREATE TABLE quizzes (
+	id VARCHAR(36) NOT NULL, 
+	course_id VARCHAR(36) NOT NULL, 
+	title VARCHAR(255) NOT NULL, 
+	pass_score INTEGER, 
+	max_attempts INTEGER, 
+	time_limit INTEGER, 
+	random_question_count INTEGER, 
+	due_date TIMESTAMP WITHOUT TIME ZONE, 
+	is_published BOOLEAN, 
+	created_at TIMESTAMP WITHOUT TIME ZONE, 
+	CONSTRAINT pk_quizzes PRIMARY KEY (id), 
+	CONSTRAINT fk_quizzes_course_id_courses FOREIGN KEY(course_id) REFERENCES courses (id) ON DELETE CASCADE
 );
 
-create table if not exists public.notifications (
-  id text primary key,
-  user_id text not null references public.users(id) on delete cascade,
-  type text not null,
-  message text not null,
-  link text,
-  is_read boolean default false,
-  created_at timestamptz default now()
+CREATE TABLE forum_replies (
+	id VARCHAR(36) NOT NULL, 
+	thread_id VARCHAR(36) NOT NULL, 
+	author_id VARCHAR(36) NOT NULL, 
+	body TEXT NOT NULL, 
+	is_hidden BOOLEAN NOT NULL, 
+	created_at TIMESTAMP WITHOUT TIME ZONE, 
+	CONSTRAINT pk_forum_replies PRIMARY KEY (id), 
+	CONSTRAINT fk_forum_replies_thread_id_forum_threads FOREIGN KEY(thread_id) REFERENCES forum_threads (id) ON DELETE CASCADE, 
+	CONSTRAINT fk_forum_replies_author_id_users FOREIGN KEY(author_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
-create table if not exists public.announcements (
-  id text primary key,
-  course_id text not null references public.courses(id) on delete cascade,
-  author_id text not null references public.users(id) on delete cascade,
-  title text not null,
-  body text not null,
-  is_pinned boolean default false,
-  created_at timestamptz default now()
+CREATE TABLE learning_logs (
+	log_id VARCHAR(36) NOT NULL, 
+	user_id VARCHAR(36) NOT NULL, 
+	lesson_id VARCHAR(36) NOT NULL, 
+	action_type VARCHAR(20) NOT NULL, 
+	timestamp TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+	CONSTRAINT pk_learning_logs PRIMARY KEY (log_id), 
+	CONSTRAINT fk_learning_logs_user_id_users FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE, 
+	CONSTRAINT fk_learning_logs_lesson_id_lessons FOREIGN KEY(lesson_id) REFERENCES lessons (id) ON DELETE CASCADE
 );
 
-create table if not exists public.forum_threads (
-  id text primary key,
-  course_id text not null references public.courses(id) on delete cascade,
-  author_id text not null references public.users(id) on delete cascade,
-  title text not null,
-  body text not null,
-  is_pinned boolean default false,
-  is_hidden boolean not null default false,
-  created_at timestamptz default now()
+CREATE TABLE questions (
+	id VARCHAR(36) NOT NULL, 
+	quiz_id VARCHAR(36) NOT NULL, 
+	text TEXT NOT NULL, 
+	q_type VARCHAR(20), 
+	sequence_order INTEGER, 
+	CONSTRAINT pk_questions PRIMARY KEY (id), 
+	CONSTRAINT fk_questions_quiz_id_quizzes FOREIGN KEY(quiz_id) REFERENCES quizzes (id) ON DELETE CASCADE
 );
 
-create table if not exists public.forum_replies (
-  id text primary key,
-  thread_id text not null references public.forum_threads(id) on delete cascade,
-  author_id text not null references public.users(id) on delete cascade,
-  body text not null,
-  is_hidden boolean not null default false,
-  created_at timestamptz default now()
+CREATE TABLE quiz_attempts (
+	id VARCHAR(36) NOT NULL, 
+	quiz_id VARCHAR(36) NOT NULL, 
+	user_id VARCHAR(36) NOT NULL, 
+	score INTEGER, 
+	passed BOOLEAN, 
+	attempted_at TIMESTAMP WITHOUT TIME ZONE, 
+	completed_at TIMESTAMP WITHOUT TIME ZONE, 
+	CONSTRAINT pk_quiz_attempts PRIMARY KEY (id), 
+	CONSTRAINT fk_quiz_attempts_quiz_id_quizzes FOREIGN KEY(quiz_id) REFERENCES quizzes (id) ON DELETE CASCADE, 
+	CONSTRAINT fk_quiz_attempts_user_id_users FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
-create table if not exists public.certificates (
-  id text primary key,
-  user_id text not null references public.users(id) on delete cascade,
-  course_id text not null references public.courses(id) on delete cascade,
-  cert_code text unique,
-  issued_at timestamptz default now(),
-  constraint uq_certificates_user_course unique (user_id, course_id)
+CREATE TABLE submissions (
+	id VARCHAR(36) NOT NULL, 
+	assignment_id VARCHAR(36) NOT NULL, 
+	user_id VARCHAR(36) NOT NULL, 
+	text_content TEXT, 
+	file_path VARCHAR(500), 
+	submitted_at TIMESTAMP WITHOUT TIME ZONE, 
+	status VARCHAR(20), 
+	score INTEGER, 
+	feedback TEXT, 
+	graded_at TIMESTAMP WITHOUT TIME ZONE, 
+	graded_by VARCHAR(36), 
+	CONSTRAINT pk_submissions PRIMARY KEY (id), 
+	CONSTRAINT uq_submissions_user_assignment UNIQUE (user_id, assignment_id), 
+	CONSTRAINT fk_submissions_assignment_id_assignments FOREIGN KEY(assignment_id) REFERENCES assignments (id) ON DELETE CASCADE, 
+	CONSTRAINT fk_submissions_user_id_users FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE, 
+	CONSTRAINT fk_submissions_graded_by_users FOREIGN KEY(graded_by) REFERENCES users (id) ON DELETE SET NULL
 );
 
-alter table public.users
-  add column if not exists phone text,
-  add column if not exists is_active boolean not null default true,
-  add column if not exists last_login timestamptz,
-  add column if not exists login_count integer not null default 0,
-  add column if not exists reset_token text,
-  add column if not exists reset_token_expiry timestamptz;
+CREATE TABLE choices (
+	id VARCHAR(36) NOT NULL, 
+	question_id VARCHAR(36) NOT NULL, 
+	text TEXT NOT NULL, 
+	is_correct BOOLEAN, 
+	CONSTRAINT pk_choices PRIMARY KEY (id), 
+	CONSTRAINT fk_choices_question_id_questions FOREIGN KEY(question_id) REFERENCES questions (id) ON DELETE CASCADE
+);
 
-alter table public.courses
-  add column if not exists short_description text not null default '',
-  add column if not exists status text not null default 'draft',
-  add column if not exists is_deleted boolean not null default false,
-  add column if not exists category_id text,
-  add column if not exists rejection_note text,
-  add column if not exists submitted_at timestamptz,
-  add column if not exists published_at timestamptz,
-  add column if not exists price integer not null default 250000,
-  add column if not exists tags text not null default '',
-  add column if not exists level text not null default '';
-
-alter table public.quizzes
-  add column if not exists time_limit integer,
-  add column if not exists random_question_count integer default 0,
-  add column if not exists due_date timestamptz;
-
-create index if not exists ix_users_role on public.users(role);
-create index if not exists ix_courses_status on public.courses(status);
-create index if not exists ix_courses_is_deleted on public.courses(is_deleted);
-create index if not exists ix_courses_teacher_id on public.courses(teacher_id);
-create index if not exists ix_lessons_course_id on public.lessons(course_id);
-create index if not exists ix_enrollments_user_id on public.enrollments(user_id);
-create index if not exists ix_enrollments_course_id on public.enrollments(course_id);
-create index if not exists ix_learning_logs_user_id on public.learning_logs(user_id);
-create index if not exists ix_learning_logs_lesson_id on public.learning_logs(lesson_id);
-create index if not exists ix_learning_logs_timestamp on public.learning_logs(timestamp);
-create index if not exists ix_quizzes_course_id on public.quizzes(course_id);
-create index if not exists ix_questions_quiz_id on public.questions(quiz_id);
-create index if not exists ix_choices_question_id on public.choices(question_id);
-create index if not exists ix_quiz_attempts_quiz_id on public.quiz_attempts(quiz_id);
-create index if not exists ix_quiz_attempts_user_id on public.quiz_attempts(user_id);
+CREATE TABLE quiz_answers (
+	id VARCHAR(36) NOT NULL, 
+	attempt_id VARCHAR(36) NOT NULL, 
+	question_id VARCHAR(36) NOT NULL, 
+	choice_id VARCHAR(36), 
+	text_answer TEXT, 
+	CONSTRAINT pk_quiz_answers PRIMARY KEY (id), 
+	CONSTRAINT fk_quiz_answers_attempt_id_quiz_attempts FOREIGN KEY(attempt_id) REFERENCES quiz_attempts (id) ON DELETE CASCADE, 
+	CONSTRAINT fk_quiz_answers_question_id_questions FOREIGN KEY(question_id) REFERENCES questions (id) ON DELETE CASCADE, 
+	CONSTRAINT fk_quiz_answers_choice_id_choices FOREIGN KEY(choice_id) REFERENCES choices (id) ON DELETE CASCADE
+);
