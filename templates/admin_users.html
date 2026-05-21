@@ -61,6 +61,9 @@
               <select name="role" class="btn btn-outline btn-sm" onchange="this.form.submit()" {% if u.id == current_user.id %}disabled{% endif %} style="background: var(--card-bg); color: var(--text-main); border: 1px solid var(--card-border); cursor: pointer;">
                 <option value="student" style="color: #0f172a; background: #ffffff;" {% if u.role == 'student' %}selected{% endif %}>Student</option>
                 <option value="teacher" style="color: #0f172a; background: #ffffff;" {% if u.role == 'teacher' %}selected{% endif %}>Teacher</option>
+                <option value="hoc_vu" style="color: #0f172a; background: #ffffff;" {% if u.role == 'hoc_vu' %}selected{% endif %}>Học vụ</option>
+                <option value="le_tan" style="color: #0f172a; background: #ffffff;" {% if u.role == 'le_tan' %}selected{% endif %}>Lễ tân</option>
+                <option value="ke_toan" style="color: #0f172a; background: #ffffff;" {% if u.role == 'ke_toan' %}selected{% endif %}>Kế toán</option>
                 <option value="admin" style="color: #0f172a; background: #ffffff;" {% if u.role == 'admin' %}selected{% endif %}>Admin</option>
               </select>
             </form>

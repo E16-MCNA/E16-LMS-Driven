@@ -53,15 +53,16 @@ def oauth_authorize(name):
     email = user_info["email"].lower()
     user = db.session.query(User).filter(User.email == email).first()
 
+    # LOGIN-ONLY: do not auto-create accounts via OAuth.
+    # Users must be provisioned by Học vụ or Admin first.
     if not user:
-        # Tự động tạo tài khoản nếu chưa có
-        user = User(
-            email=email,
-            password_hash=generate_password_hash(secrets.token_urlsafe(16)),
-            role="student",
-        )
-        db.session.add(user)
-        db.session.commit()
+        flash("Email này chưa được cấp tài khoản. "
+              "Vui lòng liên hệ bộ phận học vụ.", "error")
+        return redirect(url_for("auth.login"))
+
+    if not user.is_active:
+        flash("Tài khoản đã bị vô hiệu hóa.", "error")
+        return redirect(url_for("auth.login"))
 
     user.last_login = _utcnow()
     user.login_count = (user.login_count or 0) + 1
@@ -72,6 +73,11 @@ def oauth_authorize(name):
     log_action("login_success", "User", user.id, {"email": email, "method": f"oauth_{name}"})
     logger.log(f"login_oauth_{name}", user_id=user.id, user_email=user.email, metadata={"method": name})
     flash(f"Chào mừng {email}!", "success")
+
+    # If user still needs to change password, redirect there
+    if user.must_change_password:
+        return redirect(url_for("auth.change_password"))
+
     return redirect(url_for("auth.home"))
 
 
@@ -83,44 +89,19 @@ def home():
         return redirect(url_for("student.dashboard"))
     if current_user.role == "teacher":
         return redirect(url_for("teacher.dashboard"))
+    if current_user.role == "hoc_vu":
+        return redirect(url_for("hoc_vu.dashboard"))
+    if current_user.role in ("le_tan", "ke_toan"):
+        # Stub: redirect to analytics for now
+        return redirect(url_for("analytics.dashboard"))
     return redirect(url_for("analytics.dashboard"))
 
 
 @bp.route("/register", methods=["GET", "POST"])
-@limiter.limit("15 per minute")
 def register():
-    if current_user.is_authenticated:
-        return redirect(url_for("auth.home"))
-    if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "")
-        phone = request.form.get("phone", "").strip()
-        role = request.form.get("role", "student")
-        # Security: chỉ cho phép student hoặc teacher tự đăng ký
-        if role not in {"student", "teacher"}:
-            role = "student"
-        if len(password) < 8:
-            flash("Mật khẩu phải có ít nhất 8 ký tự.", "error")
-            return redirect(url_for("auth.register"))
-        confirm_password = request.form.get("confirm_password", "")
-        if password != confirm_password:
-            flash("Mật khẩu và xác nhận mật khẩu không khớp.", "error")
-            return redirect(url_for("auth.register"))
-        if not email or not password:
-            flash("Email và mật khẩu là bắt buộc.", "error")
-            return redirect(url_for("auth.register"))
-        if db.session.query(User).filter(User.email == email).first():
-            flash("Email đã tồn tại.", "error")
-            return redirect(url_for("auth.register"))
-        user = User(email=email, password_hash=generate_password_hash(password), role=role, phone=phone)
-        db.session.add(user)
-        db.session.commit()
-        from ..services.audit import log_action
-        log_action("user_registered", "User", user.id, {"email": email, "role": role})
-        logger.log("register", user_id=user.id, user_email=user.email, metadata={"role": role})
-        flash("Đăng ký thành công. Mời đăng nhập.", "success")
-        return redirect(url_for("auth.login"))
-    return render_template("register.html")
+    """Registration is disabled — accounts are created by Học vụ or Admin."""
+    flash("Đăng ký tài khoản đã được tắt. Vui lòng liên hệ bộ phận Học vụ để được cấp tài khoản.", "info")
+    return redirect(url_for("auth.login"))
 
 
 @bp.route("/login", methods=["GET", "POST"])
@@ -159,6 +140,39 @@ def logout():
         logger.log("logout", user_id=current_user.id, user_email=current_user.email)
     logout_user()
     return redirect(url_for("auth.login"))
+
+
+@bp.route("/change-password", methods=["GET", "POST"])
+@limiter.limit("15 per minute")
+def change_password():
+    """Force password change for first login or voluntary password change."""
+    if not current_user.is_authenticated:
+        return redirect(url_for("auth.login"))
+
+    if request.method == "POST":
+        new_password = request.form.get("new_password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        if len(new_password) < 8:
+            flash("Mật khẩu mới phải có ít nhất 8 ký tự.", "error")
+            return redirect(url_for("auth.change_password"))
+
+        if new_password != confirm_password:
+            flash("Mật khẩu xác nhận không khớp.", "error")
+            return redirect(url_for("auth.change_password"))
+
+        current_user.password_hash = generate_password_hash(new_password)
+        current_user.must_change_password = False
+        current_user.temp_password_hash = None
+        db.session.commit()
+
+        from ..services.audit import log_action
+        log_action("password_changed", "User", current_user.id,
+                   {"forced": True})
+        flash("Đổi mật khẩu thành công!", "success")
+        return redirect(url_for("auth.home"))
+
+    return render_template("change_password.html")
 
 
 @bp.route("/forgot-password", methods=["GET", "POST"])
@@ -221,6 +235,8 @@ def reset_password(token):
         user.password_hash = generate_password_hash(password)
         user.reset_token = None
         user.reset_token_expiry = None
+        user.must_change_password = False
+        user.temp_password_hash = None
         db.session.commit()
         flash("Mật khẩu đã được cập nhật. Vui lòng đăng nhập lại.", "success")
         return redirect(url_for("auth.login"))
@@ -254,14 +270,16 @@ def _run_seed(seed_password):
     core_users = [
         ("admin@e16.local", "admine16", "admin"),
         ("teacher@e16.local", "teachere16", "teacher"),
-        ("student@e16.local", "studente16", "student")
+        ("student@e16.local", "studente16", "student"),
+        ("hocvu@e16.local", "hocvue16", "hoc_vu"),
     ]
     
     teacher = None
     for email, pwd, role in core_users:
         u = db.session.query(User).filter_by(email=email).first()
         if not u:
-            u = User(email=email, password_hash=generate_password_hash(pwd), role=role)
+            u = User(email=email, password_hash=generate_password_hash(pwd),
+                     role=role, must_change_password=False)
             db.session.add(u)
         else:
             # Force the correct role if user already exists
@@ -274,7 +292,8 @@ def _run_seed(seed_password):
     for i in range(1, 6):
         email = f"student{i}@e16.local"
         if not db.session.query(User).filter_by(email=email).first():
-            db.session.add(User(email=email, password_hash=generate_password_hash(seed_password), role="student"))
+            db.session.add(User(email=email, password_hash=generate_password_hash(seed_password),
+                                role="student", must_change_password=False))
     db.session.commit()
 
     course_data = [

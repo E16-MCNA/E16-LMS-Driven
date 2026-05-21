@@ -114,14 +114,13 @@ def submit_course(course_id):
     if lesson_count == 0:
         flash("Bạn cần thêm ít nhất một bài học trước khi gửi duyệt.", "error")
         return redirect(url_for("teacher.manage_courses"))
-        
-    course.status = "pending_review"
-    course.submitted_at = utcnow()
-    db.session.commit()
-    
-    from ..services.audit import log_action
-    log_action("course_submitted", "Course", course_id)
-    flash("Khóa học đã được gửi cho Admin duyệt.", "success")
+
+    from ..services.course_lifecycle import transition_course, InvalidTransitionError
+    try:
+        transition_course(course_id, "pending_review", current_user.id)
+        flash("Khóa học đã được gửi cho Học vụ duyệt.", "success")
+    except InvalidTransitionError as e:
+        flash(str(e), "error")
     return redirect(url_for("teacher.manage_courses"))
 
 

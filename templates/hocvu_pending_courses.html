@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="top-header">
+  <div>
+    <h1>Duyệt khóa học</h1>
+    <p>Kiểm soát nội dung trước khi xuất bản lên nền tảng.</p>
+  </div>
+</header>
+
+<div style="display: flex; flex-direction: column; gap: 20px;">
+  {% if courses %}
+    {% for course, teacher in courses %}
+      <div class="card" style="display: flex; gap: 24px; align-items: flex-start;">
+        <div style="width: 120px; height: 80px; background: var(--bg-soft); border-radius: 8px; overflow: hidden; flex-shrink: 0;">
+          {% if course.cover_image_url %}
+            <img src="{{ course.cover_image_url }}" style="width: 100%; height: 100%; object-fit: cover;">
+          {% else %}
+            <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 2rem;">📚</div>
+          {% endif %}
+        </div>
+        <div style="flex: 1;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+            <h3 style="margin: 0;">{{ course.title }}</h3>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Gửi lúc: {{ course.submitted_at.strftime('%d/%m/%Y %H:%M') if course.submitted_at else '—' }}</span>
+          </div>
+          <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px;">
+            Giảng viên: <strong>{{ teacher.email }}</strong> · {{ course.total_lessons }} bài học
+          </p>
+
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <a href="{{ url_for('student.learn', course_id=course.id) }}" target="_blank" class="btn btn-outline btn-sm">Xem Preview</a>
+
+            <form action="{{ url_for('hoc_vu.review_course', course_id=course.id) }}" method="post" onsubmit="return confirmAction(this, 'Phe duyet khoa hoc', 'Khoa hoc se duoc duyet. Xac nhan?', '✅')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="action" value="approve">
+              <button type="submit" class="btn btn-primary btn-sm">Duyệt</button>
+            </form>
+
+            <button onclick="document.getElementById('reject-form-{{ course.id }}').style.display='block'" class="btn btn-danger btn-sm">Từ chối</button>
+          </div>
+
+          <div id="reject-form-{{ course.id }}" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--card-border);">
+            <form action="{{ url_for('hoc_vu.review_course', course_id=course.id) }}" method="post" class="form-group">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="action" value="reject">
+              <label>Lý do từ chối (gửi đến giảng viên)</label>
+              <textarea name="review_note" rows="2" placeholder="Vd: Nội dung video chưa đạt chất lượng..." required></textarea>
+              <div style="display: flex; gap: 8px; margin-top: 12px;">
+                <button type="submit" class="btn btn-danger btn-sm">Xác nhận từ chối</button>
+                <button type="button" onclick="document.getElementById('reject-form-{{ course.id }}').style.display='none'" class="btn btn-outline btn-sm">Hủy</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-box">Không có khóa học nào đang chờ duyệt.</div>
+  {% endif %}
+</div>
+{% endblock %}

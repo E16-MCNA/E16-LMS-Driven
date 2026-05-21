@@ -72,6 +72,30 @@
             <a href="{{ url_for('admin.list_reports') }}" class="nav-item {% if request.endpoint == 'admin.list_reports' %}active{% endif %}">
               <span>Báo cáo nội dung</span>
             </a>
+          {% elif current_user.role == 'hoc_vu' %}
+            <a href="{{ url_for('hoc_vu.dashboard') }}" class="nav-item {% if request.endpoint == 'hoc_vu.dashboard' %}active{% endif %}">
+              <span>Dashboard</span>
+            </a>
+            <a href="{{ url_for('hoc_vu.create_account') }}" class="nav-item {% if request.endpoint == 'hoc_vu.create_account' %}active{% endif %}">
+              <span>Tạo tài khoản</span>
+            </a>
+            <a href="{{ url_for('hoc_vu.import_accounts_view') }}" class="nav-item {% if request.endpoint in ('hoc_vu.import_accounts_view', 'hoc_vu.import_accounts') %}active{% endif %}">
+              <span>Import hàng loạt</span>
+            </a>
+            <a href="{{ url_for('hoc_vu.list_accounts') }}" class="nav-item {% if request.endpoint == 'hoc_vu.list_accounts' %}active{% endif %}">
+              <span>Tài khoản đã tạo</span>
+            </a>
+            <a href="{{ url_for('hoc_vu.pending_courses') }}" class="nav-item {% if request.endpoint == 'hoc_vu.pending_courses' %}active{% endif %}">
+              <span>Duyệt khoá học</span>
+            </a>
+          {% elif current_user.role == 'le_tan' %}
+            <a href="{{ url_for('analytics.dashboard') }}" class="nav-item {% if request.blueprint == 'analytics' %}active{% endif %}">
+              <span>Dashboard</span>
+            </a>
+          {% elif current_user.role == 'ke_toan' %}
+            <a href="{{ url_for('analytics.dashboard') }}" class="nav-item {% if request.blueprint == 'analytics' %}active{% endif %}">
+              <span>Dashboard</span>
+            </a>
           {% endif %}
         </nav>
         <div class="sidebar-footer">

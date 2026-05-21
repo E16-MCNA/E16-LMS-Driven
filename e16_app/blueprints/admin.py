@@ -12,7 +12,7 @@ from sqlalchemy import func
 
 from ..auth_utils import login_required, role_required
 from ..extensions import db
-from ..models import User, Category, Course, SystemSetting, AuditLog, Enrollment
+from ..models import User, Category, Course, SystemSetting, AuditLog, Enrollment, VALID_ROLES
 from ..pagination import get_pagination, paginate_query
 from ..services.audit import log_action
 from ..services.settings import flush_settings_cache
@@ -72,7 +72,7 @@ def update_user_role(user_id):
         return redirect(url_for("admin.list_users"))
     user = db.session.get(User, user_id)
     new_role = request.form.get("role")
-    if user and new_role in ["student", "teacher", "admin"]:
+    if user and new_role in VALID_ROLES:
         old_role = user.role
         user.role = new_role
         db.session.commit()
@@ -272,7 +272,7 @@ def import_users():
             results.append({"email": email, "status": "Lỗi", "reason": "Email không hợp lệ"})
             continue
 
-        if role not in {"student", "teacher", "admin"}:
+        if role not in VALID_ROLES:
             error_count += 1
             results.append({"email": email, "status": "Lỗi", "reason": "Role không hợp lệ"})
             continue
@@ -291,7 +291,9 @@ def import_users():
             password_hash=generate_password_hash(temp_pass),
             role=role,
             phone=phone,
-            is_active=is_active_raw not in {"false", "0", "no", "inactive"}
+            is_active=is_active_raw not in {"false", "0", "no", "inactive"},
+            must_change_password=True,
+            created_by=current_user.id,
         )
         db.session.add(user)
         success_count += 1
@@ -319,33 +321,25 @@ def pending_courses():
 @login_required
 @role_required("admin")
 def approve_course(course_id):
-    course = db.session.get(Course, course_id)
-    if course and not course.is_deleted:
-        course.status = "published"
-        course.published_at = utcnow()
-        db.session.commit()
-        
-        from ..services.notifications import notify
-        notify(course.teacher_id, "announcement", f"Khóa học của bạn '{course.title}' đã được duyệt và xuất bản!", url_for("teacher.manage_courses"))
-        log_action("course_approved", "Course", course_id)
+    from ..services.course_lifecycle import transition_course, InvalidTransitionError
+    try:
+        transition_course(course_id, "approved", current_user.id)
         flash("Đã duyệt khóa học.", "success")
+    except InvalidTransitionError as e:
+        flash(str(e), "error")
     return redirect(url_for("admin.pending_courses"))
 
 @bp.post("/courses/<course_id>/reject")
 @login_required
 @role_required("admin")
 def reject_course(course_id):
-    course = db.session.get(Course, course_id)
+    from ..services.course_lifecycle import transition_course, InvalidTransitionError
     note = request.form.get("rejection_note")
-    if course and not course.is_deleted:
-        course.status = "rejected"
-        course.rejection_note = note
-        db.session.commit()
-        
-        from ..services.notifications import notify
-        notify(course.teacher_id, "announcement", f"Khóa học '{course.title}' bị từ chối duyệt. Lý do: {note}", url_for("teacher.manage_courses"))
-        log_action("course_rejected", "Course", course_id, {"reason": note})
+    try:
+        transition_course(course_id, "rejected", current_user.id, note)
         flash("Đã từ chối khóa học.", "info")
+    except InvalidTransitionError as e:
+        flash(str(e), "error")
     return redirect(url_for("admin.pending_courses"))
 
 @bp.route("/seed", methods=["GET", "POST"])
@@ -409,9 +403,10 @@ def seed_system():
     # Seed Users — read password from env var, never hardcode
     from werkzeug.security import generate_password_hash
     users = [
-        {"email": "admin@e16.local", "password_hash": generate_password_hash(seed_password), "role": "admin"},
-        {"email": "teacher@e16.local", "password_hash": generate_password_hash(seed_password), "role": "teacher"},
-        {"email": "student@e16.local", "password_hash": generate_password_hash(seed_password), "role": "student"}
+        {"email": "admin@e16.local", "password_hash": generate_password_hash(seed_password), "role": "admin", "must_change_password": False},
+        {"email": "teacher@e16.local", "password_hash": generate_password_hash(seed_password), "role": "teacher", "must_change_password": False},
+        {"email": "student@e16.local", "password_hash": generate_password_hash(seed_password), "role": "student", "must_change_password": False},
+        {"email": "hocvu@e16.local", "password_hash": generate_password_hash(seed_password), "role": "hoc_vu", "must_change_password": False},
     ]
     for u_data in users:
         if not db.session.query(User).filter_by(email=u_data["email"]).first():

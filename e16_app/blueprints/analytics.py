@@ -20,7 +20,7 @@ def _export_max_rows() -> int:
 
 @bp.route("/")
 @login_required
-@role_required("admin")
+@role_required("admin", "hoc_vu", "le_tan", "ke_toan")
 def dashboard():
     days = int(request.args.get("range", 30))
     now = utcnow()

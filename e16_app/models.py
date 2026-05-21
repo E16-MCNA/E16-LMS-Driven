@@ -15,6 +15,27 @@ def new_uuid() -> str:
     return str(uuid.uuid4())
 
 
+# --- Role & Status Constants ---
+VALID_ROLES = {"admin", "teacher", "student", "hoc_vu", "le_tan", "ke_toan"}
+
+COURSE_STATUSES = {
+    "draft", "pending_review", "approved", "published",
+    "running", "closed", "archived", "suspended", "rejected",
+}
+
+COURSE_TRANSITIONS = {
+    "draft":          ["pending_review"],
+    "pending_review": ["approved", "rejected"],
+    "rejected":       ["draft"],
+    "approved":       ["published"],
+    "published":      ["running", "suspended"],
+    "running":        ["closed", "suspended"],
+    "suspended":      ["running", "published"],
+    "closed":         ["archived"],
+    "archived":       [],
+}
+
+
 class User(UserMixin, db.Model):
     __tablename__ = "users"
     id = db.Column(db.String(36), primary_key=True, default=new_uuid)
@@ -28,6 +49,11 @@ class User(UserMixin, db.Model):
     login_count = db.Column(db.Integer, default=0, nullable=False)
     reset_token = db.Column(db.String(100), nullable=True, unique=True)
     reset_token_expiry = db.Column(db.DateTime, nullable=True)
+
+    # --- New: Force password change & account provenance ---
+    must_change_password = db.Column(db.Boolean, default=True, nullable=False)
+    created_by = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=True, index=True)
+    temp_password_hash = db.Column(db.String(255), nullable=True)
 
 
 class Category(db.Model):
@@ -51,7 +77,7 @@ class Course(db.Model):
     description = db.Column(db.Text, default="", nullable=False)
     cover_image_url = db.Column(db.String(500), default="", nullable=False)
     total_lessons = db.Column(db.Integer, default=0, nullable=False)
-    status = db.Column(db.String(20), default="draft", nullable=False, index=True)  # draft, pending_review, published, rejected
+    status = db.Column(db.String(20), default="draft", nullable=False, index=True)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False, index=True)
     category_id = db.Column(db.String(36), db.ForeignKey("categories.id"), nullable=True, index=True)
     teacher_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=False, index=True)
@@ -62,6 +88,15 @@ class Course(db.Model):
     tags = db.Column(db.String(500), default="", nullable=False)  # Comma-separated: "Python,Data,AI"
     level = db.Column(db.String(20), default="", nullable=False)  # Beginner, Intermediate, Advanced
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+    # --- New: Full lifecycle metadata ---
+    reviewed_by = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    review_note = db.Column(db.Text, nullable=True)
+    starts_at = db.Column(db.DateTime, nullable=True)
+    ends_at = db.Column(db.DateTime, nullable=True)
+    enrollment_deadline = db.Column(db.DateTime, nullable=True)
+    max_students = db.Column(db.Integer, nullable=True)  # null = unlimited
 
 
 class SystemSetting(db.Model):

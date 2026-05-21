@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="top-header">
+  <div>
+    <h1>Tài khoản đã tạo</h1>
+    <p>Danh sách tài khoản do bạn tạo qua hệ thống.</p>
+  </div>
+  <div class="actions">
+    <a href="{{ url_for('hoc_vu.create_account') }}" class="btn btn-primary">➕ Tạo mới</a>
+    <a href="{{ url_for('hoc_vu.import_accounts_view') }}" class="btn btn-outline">📄 Import CSV</a>
+  </div>
+</header>
+
+<div class="card" style="padding: 0; overflow-x: auto;">
+  {% if users %}
+  <table class="table" style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr style="text-align: left; background: var(--bg-soft); border-bottom: 1px solid var(--card-border);">
+        <th style="padding: 12px;">Email</th>
+        <th style="padding: 12px;">Vai trò</th>
+        <th style="padding: 12px;">SĐT</th>
+        <th style="padding: 12px;">Ngày tạo</th>
+        <th style="padding: 12px;">Trạng thái</th>
+        <th style="padding: 12px;">Đổi MK</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr style="border-bottom: 1px solid var(--card-border);">
+        <td style="padding: 12px; font-weight: 600;">{{ u.email }}</td>
+        <td style="padding: 12px;">
+          <span class="badge" style="background: rgba(59, 130, 246, 0.1); color: var(--primary);">{{ u.role }}</span>
+        </td>
+        <td style="padding: 12px; color: var(--text-muted);">{{ u.phone or '—' }}</td>
+        <td style="padding: 12px; color: var(--text-muted);">{{ u.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+        <td style="padding: 12px;">
+          {% if u.is_active %}
+            <span class="badge" style="background: rgba(34, 197, 94, 0.1); color: var(--success);">Active</span>
+          {% else %}
+            <span class="badge" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);">Inactive</span>
+          {% endif %}
+        </td>
+        <td style="padding: 12px;">
+          {% if u.must_change_password %}
+            <span class="badge" style="background: rgba(251, 191, 36, 0.1); color: #f59e0b;">Chờ</span>
+          {% else %}
+            <span class="badge" style="background: rgba(34, 197, 94, 0.1); color: var(--success);">Xong</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <div class="empty-box" style="padding: 32px;">Chưa có tài khoản nào được tạo.</div>
+  {% endif %}
+</div>
+
+{% if pagination and pagination.pages > 1 %}
+  <div class="actions" style="justify-content: center; margin-top: 16px;">
+    {% if pagination.has_prev %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hoc_vu.list_accounts', page=pagination.page - 1) }}">Trước</a>
+    {% endif %}
+    <span class="badge" style="background: rgba(255,255,255,0.1); color: var(--text-muted);">Trang {{ pagination.page }}/{{ pagination.pages }} · {{ pagination.total }} tài khoản</span>
+    {% if pagination.has_next %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('hoc_vu.list_accounts', page=pagination.page + 1) }}">Sau</a>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

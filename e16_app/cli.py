@@ -121,9 +121,53 @@ def run_jobs_command(interval):
     except KeyboardInterrupt:
         click.echo("Worker stopped by user.")
 
+@click.command("create-hoc-vu")
+@click.option("--email", prompt="Học vụ email", help="Email for the Học vụ user.")
+@click.option(
+    "--password",
+    prompt="Học vụ password",
+    hide_input=True,
+    confirmation_prompt=True,
+    help="Password for the Học vụ user.",
+)
+@with_appcontext
+def create_hoc_vu_command(email, password):
+    """Create or update a Học vụ (Academic Affairs) user."""
+    user = db.session.query(User).filter_by(email=email).first()
+    if user:
+        user.role = "hoc_vu"
+        user.password_hash = generate_password_hash(password)
+        user.is_active = True
+        user.must_change_password = False
+        click.echo(f"Updated existing user to hoc_vu: {email}")
+    else:
+        user = User(
+            email=email,
+            password_hash=generate_password_hash(password),
+            role="hoc_vu",
+            is_active=True,
+            must_change_password=False,
+        )
+        db.session.add(user)
+        click.echo(f"Created hoc_vu user: {email}")
+
+    db.session.commit()
+
+
+@click.command("auto-transition-courses")
+@with_appcontext
+def auto_transition_courses_command():
+    """Auto-transition courses based on starts_at/ends_at dates."""
+    from .services.course_lifecycle import auto_transition_courses
+
+    changed = auto_transition_courses()
+    click.echo(f"Auto-transition complete. {changed} course(s) transitioned.")
+
 
 def init_app(app):
     app.cli.add_command(create_admin_command)
     app.cli.add_command(seed_command)
     app.cli.add_command(check_deadlines_command)
     app.cli.add_command(run_jobs_command)
+    app.cli.add_command(create_hoc_vu_command)
+    app.cli.add_command(auto_transition_courses_command)

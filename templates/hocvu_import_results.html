@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="top-header">
+  <div>
+    <h1>Kết quả Import</h1>
+    <p>Dưới đây là danh sách tài khoản đã được xử lý. <strong>Vui lòng lưu lại mật khẩu tạm thời!</strong></p>
+  </div>
+  <div class="actions">
+    <a href="{{ url_for('hoc_vu.dashboard') }}" class="btn btn-outline">Quay lại Dashboard</a>
+  </div>
+</header>
+
+<div class="card" style="padding: 0; overflow-x: auto;">
+  <table class="table" style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr style="text-align: left; background: var(--bg-soft); border-bottom: 1px solid var(--card-border);">
+        <th style="padding: 16px;">Email</th>
+        <th style="padding: 16px;">Vai trò</th>
+        <th style="padding: 16px;">Mật khẩu tạm</th>
+        <th style="padding: 16px;">Trạng thái</th>
+        <th style="padding: 16px;">Ghi chú</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for res in results %}
+        <tr style="border-bottom: 1px solid var(--card-border);">
+          <td style="padding: 16px; font-weight: 600;">{{ res.email }}</td>
+          <td style="padding: 16px;">
+            <span class="badge" style="background: rgba(59, 130, 246, 0.1); color: var(--primary);">{{ res.role or '—' }}</span>
+          </td>
+          <td style="padding: 16px;">
+            {% if res.temp_pass %}
+              <code style="background: rgba(59, 130, 246, 0.1); padding: 4px 8px; border-radius: 4px; font-weight: 700;">{{ res.temp_pass }}</code>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td style="padding: 16px;">
+            <span class="badge" style="background: {% if res.status == 'Thành công' %}rgba(34, 197, 94, 0.1); color: var(--success);{% else %}rgba(239, 68, 68, 0.1); color: var(--danger);{% endif %}">
+              {{ res.status }}
+            </span>
+          </td>
+          <td style="padding: 16px; color: var(--text-muted); font-size: 0.85rem;">{{ res.reason or '' }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

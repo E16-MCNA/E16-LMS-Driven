@@ -60,6 +60,29 @@ def create_app():
                         db.session.commit()
                     except Exception as ex:
                         app.logger.warning(f"Self-healing courses.{col_name} migration failed: {str(ex)}")
+
+            # Self-healing: new role/lifecycle columns
+            _self_heal_cols = [
+                ("users", "must_change_password", "BOOLEAN", "0"),
+                ("users", "created_by", "VARCHAR(36)", "NULL"),
+                ("users", "temp_password_hash", "VARCHAR(255)", "NULL"),
+                ("courses", "reviewed_by", "VARCHAR(36)", "NULL"),
+                ("courses", "reviewed_at", "DATETIME", "NULL"),
+                ("courses", "review_note", "TEXT", "NULL"),
+                ("courses", "starts_at", "DATETIME", "NULL"),
+                ("courses", "ends_at", "DATETIME", "NULL"),
+                ("courses", "enrollment_deadline", "DATETIME", "NULL"),
+                ("courses", "max_students", "INTEGER", "NULL"),
+            ]
+            for tbl, col, dtype, default in _self_heal_cols:
+                try:
+                    db.session.execute(text(f"SELECT {col} FROM {tbl} LIMIT 1"))
+                except Exception:
+                    try:
+                        db.session.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col} {dtype} DEFAULT {default}"))
+                        db.session.commit()
+                    except Exception as ex:
+                        app.logger.warning(f"Self-healing {tbl}.{col} migration failed: {str(ex)}")
             from .models import SystemSetting
             default_settings = [
                 {"key": "site_name", "value": "E16 LMS", "description": "Tên hệ thống"},
@@ -146,6 +169,7 @@ def create_app():
     from .blueprints.admin import bp as admin_bp
     from .blueprints.analytics import bp as analytics_bp
     from .blueprints.communication import bp as communication_bp
+    from .blueprints.hoc_vu import bp as hoc_vu_bp
 
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(student_bp)
@@ -153,6 +177,7 @@ def create_app():
     app.register_blueprint(admin_bp)
     app.register_blueprint(analytics_bp)
     app.register_blueprint(communication_bp)
+    app.register_blueprint(hoc_vu_bp)
     
     @app.template_filter("get_choices")
     def get_choices(question_id):
@@ -217,6 +242,22 @@ def create_app():
     @app.before_request
     def add_request_id():
         g.request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+
+    @app.before_request
+    def check_must_change_password():
+        """Force users with must_change_password=True to change their password."""
+        EXEMPT = {
+            'auth.change_password', 'auth.logout', 'static',
+            'healthz', 'readyz', 'metricsz',
+        }
+        if not current_user.is_authenticated:
+            return
+        if not getattr(current_user, 'must_change_password', False):
+            return
+        if request.endpoint in EXEMPT:
+            return
+        from flask import redirect as _redirect, url_for as _url_for
+        return _redirect(_url_for('auth.change_password', next=request.path))
 
     @app.after_request
     def append_request_id_header(response):
