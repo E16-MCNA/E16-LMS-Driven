@@ -259,12 +259,12 @@ def create_app():
             "site_logo": get_setting("site_logo_url", ""),
             "unread_notifs_count": 0
         }
-        if current_user.is_authenticated:
-            try:
+        try:
+            if current_user.is_authenticated:
                 from .models import Notification
                 data["unread_notifs_count"] = db.session.query(Notification).filter_by(user_id=current_user.id, is_read=False).count()
-            except Exception:
-                pass
+        except Exception:
+            pass
         return data
 
     # --- Structured JSON Logging & Request ID correlation ---
@@ -283,6 +283,9 @@ def create_app():
                 "function": record.funcName,
                 "line": record.lineno
             }
+            if record.exc_info:
+                import traceback as tb
+                log_data["traceback"] = "".join(tb.format_exception(*record.exc_info))
             try:
                 from flask import has_request_context
                 if has_request_context() and hasattr(g, "request_id"):
