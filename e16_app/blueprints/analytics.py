@@ -35,28 +35,40 @@ def dashboard():
     today_logs = db.session.query(LearningLog).filter(LearningLog.timestamp >= now.replace(hour=0, minute=0, second=0, microsecond=0)).count()
     
     # Growth Data (Line Chart)
-    user_growth = db.session.query(
+    user_growth_rows = db.session.query(
         func.date(User.created_at).label('date'),
         func.count(User.id).label('count')
     ).filter(User.created_at >= start_date).group_by(func.date(User.created_at)).all()
+    user_growth = []
+    for r in user_growth_rows:
+        d = r[0]
+        d_str = d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)
+        user_growth.append({"date": d_str, "count": r[1]})
     
     # Enrollment Trend (Bar Chart)
-    enroll_trend = db.session.query(
+    enroll_trend_rows = db.session.query(
         func.date(Enrollment.enrolled_at).label('date'),
         func.count(Enrollment.id).label('count')
     ).filter(Enrollment.enrolled_at >= start_date).group_by(func.date(Enrollment.enrolled_at)).all()
+    enroll_trend = []
+    for r in enroll_trend_rows:
+        d = r[0]
+        d_str = d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)
+        enroll_trend.append({"date": d_str, "count": r[1]})
     
     # Top 5 Courses (Horizontal Bar)
-    top_courses = db.session.query(
+    top_courses_rows = db.session.query(
         Course.title,
         func.count(Enrollment.id).label('enroll_count')
     ).join(Enrollment).filter(Course.is_deleted == False).group_by(Course.id, Course.title).order_by(func.count(Enrollment.id).desc()).limit(5).all()
+    top_courses = [{"title": r[0], "enroll_count": r[1]} for r in top_courses_rows]
     
     # Level Distribution (Doughnut Chart)
-    level_dist = db.session.query(
+    level_dist_rows = db.session.query(
         Course.level,
         func.count(Course.id).label('count')
     ).filter(Course.status == "published", Course.is_deleted == False, Course.level != "").group_by(Course.level).all()
+    level_dist = [{"level": r[0], "count": r[1]} for r in level_dist_rows]
     
     return render_template(
         "admin_analytics.html",
