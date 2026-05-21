@@ -43,49 +43,50 @@ def create_app():
                 db.create_all()
             except Exception as e:
                 app.logger.warning(f"db.create_all() failed during startup: {str(e)}")
-            # Self-healing column migration for price column
-            try:
-                from sqlalchemy import text
-                db.session.execute(text("SELECT price FROM courses LIMIT 1"))
-            except Exception:
-                try:
-                    db.session.execute(text("ALTER TABLE courses ADD COLUMN price INTEGER DEFAULT 250000"))
-                    db.session.commit()
-                except Exception as ex:
-                    app.logger.warning(f"Self-healing courses table column migration failed: {str(ex)}")
-            # Self-healing: tags & level columns
-            for col_name, col_type, col_default in [("tags", "VARCHAR(500)", "''"), ("level", "VARCHAR(20)", "''")]:
-                try:
-                    db.session.execute(text(f"SELECT {col_name} FROM courses LIMIT 1"))
-                except Exception:
-                    try:
-                        db.session.execute(text(f"ALTER TABLE courses ADD COLUMN {col_name} {col_type} DEFAULT {col_default}"))
-                        db.session.commit()
-                    except Exception as ex:
-                        app.logger.warning(f"Self-healing courses.{col_name} migration failed: {str(ex)}")
+            # Self-healing column migrations for Vercel/database instances that have
+            # not run Alembic yet. Use SQLAlchemy inspection instead of probing with
+            # SELECT missing_column, which aborts the current PostgreSQL transaction.
+            from sqlalchemy import inspect, text
 
-            # Self-healing: new role/lifecycle columns
-            _self_heal_cols = [
-                ("users", "must_change_password", "BOOLEAN", "0"),
-                ("users", "created_by", "VARCHAR(36)", "NULL"),
-                ("users", "temp_password_hash", "VARCHAR(255)", "NULL"),
-                ("courses", "reviewed_by", "VARCHAR(36)", "NULL"),
-                ("courses", "reviewed_at", "DATETIME", "NULL"),
-                ("courses", "review_note", "TEXT", "NULL"),
-                ("courses", "starts_at", "DATETIME", "NULL"),
-                ("courses", "ends_at", "DATETIME", "NULL"),
-                ("courses", "enrollment_deadline", "DATETIME", "NULL"),
-                ("courses", "max_students", "INTEGER", "NULL"),
-            ]
-            for tbl, col, dtype, default in _self_heal_cols:
+            def ensure_column(table_name, column_name, ddl_fragment):
                 try:
-                    db.session.execute(text(f"SELECT {col} FROM {tbl} LIMIT 1"))
-                except Exception:
-                    try:
-                        db.session.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col} {dtype} DEFAULT {default}"))
-                        db.session.commit()
-                    except Exception as ex:
-                        app.logger.warning(f"Self-healing {tbl}.{col} migration failed: {str(ex)}")
+                    inspector = inspect(db.engine)
+                    columns = {col["name"] for col in inspector.get_columns(table_name)}
+                    if column_name in columns:
+                        return
+                    db.session.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {ddl_fragment}"))
+                    db.session.commit()
+                    app.logger.info(f"Self-healing added {table_name}.{column_name}")
+                except Exception as ex:
+                    db.session.rollback()
+                    app.logger.warning(f"Self-healing {table_name}.{column_name} migration failed: {str(ex)}")
+
+            bool_default_false = "0" if db.engine.dialect.name == "sqlite" else "false"
+            timestamp_type = "DATETIME" if db.engine.dialect.name == "sqlite" else "TIMESTAMP"
+            _self_heal_cols = [
+                ("courses", "price", "INTEGER DEFAULT 250000"),
+                ("courses", "tags", "VARCHAR(500) DEFAULT ''"),
+                ("courses", "level", "VARCHAR(20) DEFAULT ''"),
+                ("users", "must_change_password", f"BOOLEAN NOT NULL DEFAULT {bool_default_false}"),
+                ("users", "created_by", "VARCHAR(36) DEFAULT NULL"),
+                ("users", "temp_password_hash", "VARCHAR(255) DEFAULT NULL"),
+                ("courses", "reviewed_by", "VARCHAR(36) DEFAULT NULL"),
+                ("courses", "reviewed_at", f"{timestamp_type} DEFAULT NULL"),
+                ("courses", "review_note", "TEXT DEFAULT NULL"),
+                ("courses", "starts_at", f"{timestamp_type} DEFAULT NULL"),
+                ("courses", "ends_at", f"{timestamp_type} DEFAULT NULL"),
+                ("courses", "enrollment_deadline", f"{timestamp_type} DEFAULT NULL"),
+                ("courses", "max_students", "INTEGER DEFAULT NULL"),
+            ]
+            for tbl, col, ddl in _self_heal_cols:
+                ensure_column(tbl, col, ddl)
+
+            try:
+                db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_users_created_by ON users (created_by)"))
+                db.session.commit()
+            except Exception as ex:
+                db.session.rollback()
+                app.logger.warning(f"Self-healing users.created_by index failed: {str(ex)}")
             
             # Auto-seed initial users, categories, and settings if DB is completely empty (no users)
             from .models import User, Category, SystemSetting
