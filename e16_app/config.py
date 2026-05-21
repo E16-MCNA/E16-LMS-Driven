@@ -85,14 +85,12 @@ class ProductionConfig(Config):
     PAYMENT_MODE = os.environ.get("PAYMENT_MODE", "real").lower()
     RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://" if os.environ.get("VERCEL") else "redis://localhost:6379/0")
     
-    # Configure SQLAlchemy to support PgBouncer transaction pooling on Vercel
+    # Configure SQLAlchemy to avoid keeping stale serverless connections open on Vercel.
+    # prepare_threshold is a psycopg v3 option; this project uses psycopg2-binary.
     if os.environ.get("VERCEL"):
         from sqlalchemy.pool import NullPool
         SQLALCHEMY_ENGINE_OPTIONS = {
-            "poolclass": NullPool,
-            "connect_args": {
-                "prepare_threshold": None
-            }
+            "poolclass": NullPool
         }
     
     @classmethod
