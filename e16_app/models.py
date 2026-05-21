@@ -51,7 +51,7 @@ class User(UserMixin, db.Model):
     reset_token_expiry = db.Column(db.DateTime, nullable=True)
 
     # --- New: Force password change & account provenance ---
-    must_change_password = db.Column(db.Boolean, default=True, nullable=False)
+    must_change_password = db.Column(db.Boolean, default=False, nullable=False)
     created_by = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=True, index=True)
     temp_password_hash = db.Column(db.String(255), nullable=True)
 

@@ -5,23 +5,6 @@ from e16_app import create_app, db
 from e16_app.models import User, Course, Lesson, Enrollment, LearningLog, Quiz, Assignment, Question, Choice, Certificate, Submission
 
 @pytest.fixture
-def app():
-    app = create_app()
-    app.config.update({
-        "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "WTF_CSRF_ENABLED": False
-    })
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.drop_all()
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
-
-@pytest.fixture
 def teacher_user(app):
     with app.app_context():
         user = User(email="teacher_test@e16.edu.vn", password_hash="hash", role="teacher")
@@ -73,7 +56,6 @@ def test_student_enrollment(client, app, student_user, teacher_user):
         assert enrollment is not None
         assert enrollment.status == "active"
 
-
 def test_student_cannot_access_unenrolled_quiz_or_assignment(client, app, student_user, teacher_user):
     with app.app_context():
         course = Course(title="Private Course", teacher_id=teacher_user, status="published")
@@ -96,7 +78,6 @@ def test_student_cannot_access_unenrolled_quiz_or_assignment(client, app, studen
 
     assert quiz_response.status_code == 302
     assert assignment_response.status_code == 302
-
 
 def test_teacher_reorder_lessons_updates_sequence_order(client, app, teacher_user):
     with app.app_context():
@@ -125,7 +106,6 @@ def test_teacher_reorder_lessons_updates_sequence_order(client, app, teacher_use
         assert db.session.get(Lesson, second_id).sequence_order == 1
         assert db.session.get(Lesson, first_id).sequence_order == 2
 
-
 def test_teacher_cannot_add_question_to_other_teachers_quiz(client, app, teacher_user):
     with app.app_context():
         other_teacher = User(email="other_teacher@e16.edu.vn", password_hash="hash", role="teacher")
@@ -151,7 +131,6 @@ def test_teacher_cannot_add_question_to_other_teachers_quiz(client, app, teacher
     assert response.status_code == 403
     with app.app_context():
         assert db.session.query(Question).filter_by(quiz_id=quiz_id).count() == 0
-
 
 def test_student_can_render_quiz_with_shuffled_choices(client, app, student_user, teacher_user):
     with app.app_context():
@@ -182,7 +161,6 @@ def test_student_can_render_quiz_with_shuffled_choices(client, app, student_user
     assert response.status_code == 200
     assert b"Runtime Quiz" in response.data
 
-
 def test_teacher_can_export_gradebook(client, app, student_user, teacher_user):
     with app.app_context():
         course = Course(title="Exportable Gradebook", teacher_id=teacher_user, status="published")
@@ -201,7 +179,6 @@ def test_teacher_can_export_gradebook(client, app, student_user, teacher_user):
     assert response.status_code == 200
     assert "Exportable Gradebook" not in response.data.decode("utf-8")
     assert "student_test@e16.edu.vn" in response.data.decode("utf-8")
-
 
 def test_user_course_pairs_are_unique(app, student_user, teacher_user):
     with app.app_context():
@@ -222,7 +199,6 @@ def test_user_course_pairs_are_unique(app, student_user, teacher_user):
             db.session.commit()
         db.session.rollback()
 
-
 def test_public_certificate_masks_student_email(client, app, student_user, teacher_user):
     with app.app_context():
         course = Course(title="Privacy Course", teacher_id=teacher_user, status="published")
@@ -242,7 +218,6 @@ def test_public_certificate_masks_student_email(client, app, student_user, teach
     assert response.status_code == 200
     assert b"st***@e16.edu.vn" in response.data
     assert b"student_test@e16.edu.vn" not in response.data
-
 
 def test_teacher_delete_course_soft_deletes_and_hides_from_catalog(client, app, student_user, teacher_user):
     with app.app_context():
@@ -272,7 +247,6 @@ def test_teacher_delete_course_soft_deletes_and_hides_from_catalog(client, app, 
 
     assert catalog_response.status_code == 200
     assert b"Soft Deleted Course" not in catalog_response.data
-
 
 def test_assignment_submissions_are_paginated(client, app, student_user, teacher_user):
     with app.app_context():

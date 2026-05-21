@@ -18,23 +18,17 @@ depends_on = None
 
 def upgrade():
     # --- Users table: force-change-password + provenance ---
-    with op.batch_alter_table("users", schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column("must_change_password", sa.Boolean(), nullable=False, server_default=sa.text("1"))
-        )
-        batch_op.add_column(
-            sa.Column("created_by", sa.String(length=36), nullable=True)
-        )
-        batch_op.add_column(
-            sa.Column("temp_password_hash", sa.String(length=255), nullable=True)
-        )
-        batch_op.create_index("idx_users_created_by", ["created_by"])
-        batch_op.create_foreign_key(
-            "fk_users_created_by_users",
-            "users",
-            ["created_by"],
-            ["id"],
-        )
+    op.add_column("users", sa.Column("must_change_password", sa.Boolean(), nullable=False, server_default=sa.text("1")))
+    op.add_column("users", sa.Column("created_by", sa.String(length=36), nullable=True))
+    op.add_column("users", sa.Column("temp_password_hash", sa.String(length=255), nullable=True))
+    op.create_index("idx_users_created_by", "users", ["created_by"])
+    op.create_foreign_key(
+        "fk_users_created_by_users",
+        "users",
+        "users",
+        ["created_by"],
+        ["id"],
+    )
 
     # --- Courses table: full lifecycle metadata ---
     with op.batch_alter_table("courses", schema=None) as batch_op:

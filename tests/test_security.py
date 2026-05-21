@@ -17,27 +17,7 @@ from e16_app.models import (
     Quiz, QuizAnswer, QuizAttempt, Submission, User,
 )
 
-
 # ─────────────────────── Fixtures ───────────────────────
-
-@pytest.fixture
-def app():
-    app = create_app()
-    app.config.update({
-        "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "WTF_CSRF_ENABLED": False,
-    })
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.drop_all()
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
-
 
 @pytest.fixture
 def teacher_a(app):
@@ -48,7 +28,6 @@ def teacher_a(app):
         db.session.commit()
         return u.id
 
-
 @pytest.fixture
 def teacher_b(app):
     """Teacher B — owns nothing related to teacher_a."""
@@ -58,7 +37,6 @@ def teacher_b(app):
         db.session.commit()
         return u.id
 
-
 @pytest.fixture
 def student_a(app):
     with app.app_context():
@@ -67,7 +45,6 @@ def student_a(app):
         db.session.commit()
         return u.id
 
-
 @pytest.fixture
 def student_b(app):
     with app.app_context():
@@ -75,7 +52,6 @@ def student_b(app):
         db.session.add(u)
         db.session.commit()
         return u.id
-
 
 @pytest.fixture
 def course_with_assignment(app, teacher_a, student_a):
@@ -107,7 +83,6 @@ def course_with_assignment(app, teacher_a, student_a):
             "submission_id": sub.id,
         }
 
-
 # ─────────────────── Test: Student file isolation ───────────────────
 
 @pytest.mark.security
@@ -127,7 +102,6 @@ def test_student_cannot_download_other_students_submission(client, app, student_
     # Student role → redirected away (role_required("teacher") blocks access)
     assert response.status_code == 302
     assert "/teacher/" not in response.headers.get("Location", "")
-
 
 # ─────────────────── Test: Teacher course isolation ───────────────────
 
@@ -149,7 +123,6 @@ def test_teacher_cannot_download_submission_from_other_teachers_course(client, a
     assert response.status_code == 302
     location = response.headers.get("Location", "")
     assert "manage" in location.lower() or response.status_code == 302
-
 
 # ─────────────────── Test: Quiz review wrong course_id ───────────────────
 
@@ -205,7 +178,6 @@ def test_quiz_review_rejects_wrong_course_id(client, app, student_a, teacher_a):
     # Should redirect because quiz.course_id != fake_course_id (student.py L443)
     assert response.status_code == 302
 
-
 # ─────────────────── Test: PAYMENT_MODE=real blocks simulator ───────────────────
 
 @pytest.mark.security
@@ -243,7 +215,6 @@ def test_payment_mode_real_blocks_simulate_ipn(client, app, student_a, teacher_a
         enrollment = db.session.query(Enrollment).filter_by(user_id=student_a, course_id=course_id).first()
         assert enrollment.status == "pending_payment"
 
-
 @pytest.mark.security
 def test_payment_mode_mock_allows_simulate_ipn(client, app, student_a, teacher_a):
     """
@@ -275,7 +246,6 @@ def test_payment_mode_mock_allows_simulate_ipn(client, app, student_a, teacher_a
     with app.app_context():
         enrollment = db.session.query(Enrollment).filter_by(user_id=student_a, course_id=course_id).first()
         assert enrollment.status == "active"
-
 
 # ─────────────────── Test: Lesson completion 90-second enforcement ───────────────────
 
@@ -309,7 +279,6 @@ def test_lesson_mark_complete_rejected_without_session_start(client, app, studen
     assert response.status_code == 200
     # Should see the warning flash message about needing to open the lesson first
     assert "mở bài học".encode("utf-8") in response.data or "phút".encode("utf-8") in response.data
-
 
 @pytest.mark.security
 def test_lesson_mark_complete_rejected_under_90_seconds(client, app, student_a, teacher_a):

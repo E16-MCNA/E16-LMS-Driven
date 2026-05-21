@@ -1,4 +1,9 @@
+import os
 import sys
+
+# Ensure the parent directory is in sys.path so e16_app can be imported regardless of execution method
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from e16_app import create_app
 
 def verify():

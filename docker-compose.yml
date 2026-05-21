@@ -50,6 +50,26 @@ services:
       - uploads_data:/app/static/uploads
     restart: unless-stopped
 
+  scheduler:
+    build: .
+    command: ["python", "scripts/scheduler.py"]
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-e16_user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-e16_lms}
+      - SECRET_KEY=${SECRET_KEY:?Set SECRET_KEY in .env}
+      - E16_SEED_PASSWORD=${E16_SEED_PASSWORD:-demo-password}
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-local}
+      - RATELIMIT_STORAGE_URI=${RATELIMIT_STORAGE_URI:-redis://redis:6379/0}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-True}
+      - APP_ENV=production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/app/static/uploads
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   uploads_data:

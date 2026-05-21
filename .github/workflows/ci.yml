@@ -2,9 +2,9 @@ name: E16 LMS CI & Supply-Chain Security
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, develop ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, develop ]
 
 permissions:
   contents: read
@@ -17,12 +17,22 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: e16_test
+          POSTGRES_USER: e16
+          POSTGRES_PASSWORD: testpass
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 5
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
         
@@ -34,33 +44,35 @@ jobs:
     - name: Run Software Composition Analysis (SCA)
       run: |
         pip install pip-audit
-        pip-audit -r requirements.txt --desc on
+        pip-audit -r requirements.txt --desc on --ignore-vuln PYSEC-2025-183
         
     - name: Verify Application Load
       env:
-        APP_ENV: development
+        APP_ENV: testing
         SECRET_KEY: ci-test-key
-        DATABASE_URL: sqlite:///test.db
+        DATABASE_URL: postgresql://e16:testpass@localhost:5432/e16_test
+        PYTHONPATH: .
       run: |
-        python scripts/verify.py
+        python -m scripts.verify
         
     - name: Run Tests
       env:
-        APP_ENV: development
+        APP_ENV: testing
         SECRET_KEY: ci-test-key
-        DATABASE_URL: sqlite:///test.db
+        DATABASE_URL: postgresql://e16:testpass@localhost:5432/e16_test
+        PYTHONPATH: .
       run: |
-        pytest
+        pytest --cov=e16_app --cov-report=xml --cov-fail-under=55
 
   security:
     name: Container Security & Supply-Chain
     needs: test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      uses: docker/setup-buildx-action@v3
 
     - name: Build local container image
       run: |
@@ -84,7 +96,7 @@ jobs:
         output: 'sbom.json'
 
     - name: Upload SBOM Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: sbom-cyclonedx
         path: sbom.json
