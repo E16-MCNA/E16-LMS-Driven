@@ -7,3 +7,4 @@ scratch/
 .env
 .pytest_cache/
 backups/
+learning_logs_export.csv
