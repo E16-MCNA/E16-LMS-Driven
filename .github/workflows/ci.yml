@@ -17,6 +17,16 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: e16_test
+          POSTGRES_USER: e16
+          POSTGRES_PASSWORD: testpass
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 5
 
     steps:
     - uses: actions/checkout@v3
@@ -38,19 +48,19 @@ jobs:
         
     - name: Verify Application Load
       env:
-        APP_ENV: development
+        APP_ENV: testing
         SECRET_KEY: ci-test-key
-        DATABASE_URL: sqlite:///test.db
+        DATABASE_URL: postgresql://e16:testpass@localhost:5432/e16_test
       run: |
         python scripts/verify.py
         
     - name: Run Tests
       env:
-        APP_ENV: development
+        APP_ENV: testing
         SECRET_KEY: ci-test-key
-        DATABASE_URL: sqlite:///test.db
+        DATABASE_URL: postgresql://e16:testpass@localhost:5432/e16_test
       run: |
-        pytest
+        pytest --cov=e16_app --cov-report=xml --cov-fail-under=70
 
   security:
     name: Container Security & Supply-Chain

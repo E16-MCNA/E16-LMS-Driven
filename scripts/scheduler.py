@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import sys
 import subprocess
 import time
 from datetime import datetime, timedelta
@@ -16,8 +17,9 @@ def run_command():
         )
         print(f"[{datetime.now().isoformat()}] Success: {result.stdout.strip()}")
     except subprocess.CalledProcessError as e:
-        print(f"[{datetime.now().isoformat()}] Error running auto-transition-courses command:")
-        print(e.stderr)
+        print(f"[{datetime.now().isoformat()}] Error running auto-transition-courses command:", file=sys.stderr)
+        if e.stderr:
+            print(e.stderr, file=sys.stderr)
 
 def main():
     print(f"[{datetime.now().isoformat()}] Course auto-transition scheduler daemon started.")

@@ -9,26 +9,6 @@ from werkzeug.security import generate_password_hash
 from e16_app import create_app, db
 from e16_app.models import User
 
-
-@pytest.fixture
-def app():
-    app = create_app()
-    app.config.update({
-        "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "WTF_CSRF_ENABLED": False,
-    })
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.drop_all()
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
-
-
 def _create_user(app, email, password, role, must_change_password=False):
     """Helper: create user directly in DB (simulating Học vụ provisioning)."""
     with app.app_context():
@@ -42,35 +22,30 @@ def _create_user(app, email, password, role, must_change_password=False):
         db.session.commit()
         return u.id
 
-
 # ─────────── Register is disabled ───────────
 
 @pytest.mark.auth
 @pytest.mark.smoke
 def test_register_is_disabled(client):
-    """GET /auth/register should redirect to login."""
+    """GET /auth/register should return 410 Gone."""
     response = client.get("/auth/register")
-    assert response.status_code == 302
-    assert "/auth/login" in response.headers.get("Location", "")
-
+    assert response.status_code == 410
 
 @pytest.mark.auth
 def test_register_post_is_disabled(client, app):
-    """POST /auth/register should not create any user."""
+    """POST /auth/register should return 410 Gone and not create any user."""
     response = client.post("/auth/register", data={
         "email": "test@e16.edu.vn",
         "password": "password123",
         "confirm_password": "password123",
         "role": "student"
-    }, follow_redirects=True)
+    })
 
-    assert response.status_code == 200
-    assert response.request.path == "/auth/login"
+    assert response.status_code == 410
 
     with app.app_context():
         user = db.session.query(User).filter_by(email="test@e16.edu.vn").first()
         assert user is None
-
 
 # ─────────── Login / Logout ───────────
 
@@ -80,7 +55,6 @@ def test_login_page_loads(client):
     """Login page should load successfully."""
     response = client.get("/auth/login")
     assert response.status_code == 200
-
 
 @pytest.mark.auth
 @pytest.mark.smoke
@@ -101,7 +75,6 @@ def test_login_logout_student(client, app):
     assert response.status_code == 200
     assert response.request.path == "/auth/login"
 
-
 @pytest.mark.auth
 @pytest.mark.smoke
 def test_login_teacher_redirect(client, app):
@@ -116,7 +89,6 @@ def test_login_teacher_redirect(client, app):
     assert response.status_code == 200
     assert response.request.path == "/teacher/dashboard"
 
-
 @pytest.mark.auth
 def test_login_hocvu_redirect(client, app):
     """Học vụ should be redirected to hoc_vu dashboard."""
@@ -130,7 +102,6 @@ def test_login_hocvu_redirect(client, app):
     assert response.status_code == 200
     assert response.request.path == "/hoc-vu/dashboard"
 
-
 @pytest.mark.auth
 def test_login_incorrect_password(client, app):
     """Login with wrong password should stay on login page."""
@@ -143,7 +114,6 @@ def test_login_incorrect_password(client, app):
 
     assert response.status_code == 200
     assert response.request.path == "/auth/login"
-
 
 @pytest.mark.auth
 def test_login_inactive_user(client, app):
@@ -162,7 +132,6 @@ def test_login_inactive_user(client, app):
 
     assert response.status_code == 200
     assert response.request.path == "/auth/login"
-
 
 # ─────────── Security Headers ───────────
 

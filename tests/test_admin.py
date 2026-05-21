@@ -5,32 +5,11 @@ from io import BytesIO
 from e16_app import create_app, db
 from e16_app.models import AuditLog, Course, LearningLog, Lesson, User
 
-
-@pytest.fixture
-def app():
-    app = create_app()
-    app.config.update({
-        "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "WTF_CSRF_ENABLED": False,
-    })
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.drop_all()
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
-
-
 def test_seed_route_is_forbidden_in_production(client, monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     response = client.get("/admin/seed")
 
     assert response.status_code == 404
-
 
 def test_import_users_validates_csv_and_imports_optional_fields(client, app):
     with app.app_context():
@@ -61,7 +40,6 @@ def test_import_users_validates_csv_and_imports_optional_fields(client, app):
         assert imported.is_active is False
         assert rejected is None
 
-
 def test_import_users_rejects_missing_required_headers(client, app):
     with app.app_context():
         admin = User(email="admin2@e16.local", password_hash="hash", role="admin")
@@ -84,7 +62,6 @@ def test_import_users_rejects_missing_required_headers(client, app):
     with app.app_context():
         assert db.session.query(User).filter_by(email="user@e16.edu.vn").first() is None
 
-
 def test_delete_user_soft_deletes_account(client, app):
     with app.app_context():
         admin = User(email="soft_admin@e16.local", password_hash="hash", role="admin")
@@ -106,7 +83,6 @@ def test_delete_user_soft_deletes_account(client, app):
         assert deleted is not None
         assert deleted.is_active is False
 
-
 def test_admin_users_are_paginated(client, app):
     with app.app_context():
         admin = User(email="page_admin@e16.local", password_hash="hash", role="admin")
@@ -125,7 +101,6 @@ def test_admin_users_are_paginated(client, app):
 
     assert response.status_code == 200
     assert "Trang 2/3".encode("utf-8") in response.data
-
 
 def test_audit_log_is_paginated(client, app):
     with app.app_context():
@@ -146,7 +121,6 @@ def test_audit_log_is_paginated(client, app):
     assert response.status_code == 200
     assert "Trang 2/3".encode("utf-8") in response.data
 
-
 def test_metricsz_requires_admin_or_token(client, app, monkeypatch):
     monkeypatch.setenv("METRICS_TOKEN", "test-token")
     forbidden = client.get("/metricsz")
@@ -155,7 +129,6 @@ def test_metricsz_requires_admin_or_token(client, app, monkeypatch):
     token_response = client.get("/metricsz", headers={"X-Metrics-Token": "test-token"})
     assert token_response.status_code == 200
     assert "users_active" in token_response.json
-
 
 def test_admin_export_is_audited(client, app):
     with app.app_context():
@@ -174,7 +147,6 @@ def test_admin_export_is_audited(client, app):
     with app.app_context():
         log = db.session.query(AuditLog).filter_by(action="admin_export", target_type="Analytics", target_id="general").first()
         assert log is not None
-
 
 def test_admin_export_respects_max_rows(client, app, monkeypatch):
     monkeypatch.setenv("EXPORT_MAX_ROWS", "2")
@@ -203,7 +175,6 @@ def test_admin_export_respects_max_rows(client, app, monkeypatch):
 
     assert response.status_code == 200
     assert len(response.data.decode("utf-8").splitlines()) == 3
-
 
 def test_permission_denied_is_audited(client, app):
     with app.app_context():

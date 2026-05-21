@@ -4,26 +4,6 @@ import pytest
 from e16_app import create_app, db
 from e16_app.models import Course, Enrollment, ForumThread, ForumReply, Notification, User
 
-
-@pytest.fixture
-def app():
-    app = create_app()
-    app.config.update({
-        "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "WTF_CSRF_ENABLED": False,
-    })
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.drop_all()
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
-
-
 def test_teacher_can_hide_forum_thread(client, app):
     with app.app_context():
         teacher = User(email="mod_teacher@e16.edu.vn", password_hash="hash", role="teacher")
@@ -50,7 +30,6 @@ def test_teacher_can_hide_forum_thread(client, app):
     assert response.status_code == 302
     with app.app_context():
         assert db.session.get(ForumThread, thread_id).is_hidden is True
-
 
 def test_student_cannot_hide_forum_reply(client, app):
     with app.app_context():
@@ -82,7 +61,6 @@ def test_student_cannot_hide_forum_reply(client, app):
     with app.app_context():
         assert db.session.get(ForumReply, reply_id).is_hidden is False
 
-
 def test_notifications_are_paginated(client, app):
     with app.app_context():
         user = User(email="notif_user@e16.edu.vn", password_hash="hash", role="student")
@@ -101,7 +79,6 @@ def test_notifications_are_paginated(client, app):
 
     assert response.status_code == 200
     assert "Trang 2/3".encode("utf-8") in response.data
-
 
 def test_student_can_report_thread_and_reply(client, app):
     with app.app_context():
@@ -156,7 +133,6 @@ def test_student_can_report_thread_and_reply(client, app):
         assert reply_report.reason == "Toxic"
         assert reply_report.detail == "This is toxic reply"
         assert reply_report.reporter_id == student_id
-
 
 def test_admin_can_resolve_content_report_hide_and_dismiss(client, app):
     with app.app_context():

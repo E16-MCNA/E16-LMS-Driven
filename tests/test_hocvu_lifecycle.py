@@ -14,29 +14,9 @@ from e16_app.models import (
     User, Course, Enrollment, Lesson, Certificate,
 )
 
-
 # ═══════════════════════════════════════════════════════════
 #                        FIXTURES
 # ═══════════════════════════════════════════════════════════
-
-@pytest.fixture
-def app():
-    app = create_app()
-    app.config.update({
-        "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "WTF_CSRF_ENABLED": False,
-    })
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.drop_all()
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
-
 
 def _mk(app, email, role, password="testpass1", must_change=False):
     """Create a user and return the id."""
@@ -51,14 +31,12 @@ def _mk(app, email, role, password="testpass1", must_change=False):
         db.session.commit()
         return u.id
 
-
 def _login(client, email, password="testpass1"):
     """Login helper."""
     return client.post("/auth/login", data={
         "email": email,
         "password": password,
     })
-
 
 def _mk_course(app, teacher_id, title="Test Course", status="draft"):
     """Create a course and return the id."""
@@ -67,7 +45,6 @@ def _mk_course(app, teacher_id, title="Test Course", status="draft"):
         db.session.add(c)
         db.session.commit()
         return c.id
-
 
 # ═══════════════════════════════════════════════════════════
 #           1. MODEL CONSTANTS & TRANSITIONS
@@ -98,7 +75,6 @@ class TestModelConstants:
     def test_all_statuses_have_transition_entry(self):
         for status in COURSE_STATUSES:
             assert status in COURSE_TRANSITIONS
-
 
 # ═══════════════════════════════════════════════════════════
 #           2. FORCE PASSWORD CHANGE MIDDLEWARE
@@ -197,7 +173,6 @@ class TestForcePasswordChange:
 
         response = client.get("/dashboard")
         assert response.status_code == 200
-
 
 # ═══════════════════════════════════════════════════════════
 #           3. HỌC VỤ — SINGLE ACCOUNT CREATION
@@ -321,7 +296,6 @@ class TestHocVuAccountCreation:
             assert enrollment is not None
             assert enrollment.status == "active"
 
-
 # ═══════════════════════════════════════════════════════════
 #           4. HỌC VỤ — CSV IMPORT
 # ═══════════════════════════════════════════════════════════
@@ -415,7 +389,6 @@ class TestHocVuCSVImport:
         response = client.post("/hoc-vu/accounts/import", data={},
                                follow_redirects=True)
         assert response.status_code == 200
-
 
 # ═══════════════════════════════════════════════════════════
 #           5. COURSE LIFECYCLE STATE MACHINE
@@ -533,7 +506,6 @@ class TestCourseLifecycle:
             course = transition_course(course_id, "draft", teacher_id)
             assert course.status == "draft"
 
-
 # ═══════════════════════════════════════════════════════════
 #           6. COURSE APPROVAL VIA HỌC VỤ ROUTES
 # ═══════════════════════════════════════════════════════════
@@ -597,7 +569,6 @@ class TestHocVuCourseApproval:
         with app.app_context():
             course = db.session.get(Course, course_id)
             assert course.status == "pending_review"  # not changed
-
 
 # ═══════════════════════════════════════════════════════════
 #           7. ROLE-BASED ACCESS CONTROL (NEW ROLES)
@@ -691,7 +662,6 @@ class TestNewRoleAccess:
         assert response.status_code == 302
         assert "login" in response.headers.get("Location", "").lower()
 
-
 # ═══════════════════════════════════════════════════════════
 #           8. HỌC VỤ DASHBOARD
 # ═══════════════════════════════════════════════════════════
@@ -719,7 +689,6 @@ class TestHocVuDashboard:
         response = client.get("/hoc-vu/courses/pending")
         assert response.status_code == 200
         assert b"Pending Course" in response.data
-
 
 # ═══════════════════════════════════════════════════════════
 #           9. END-TO-END: FULL ACCOUNT LIFECYCLE

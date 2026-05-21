@@ -13,28 +13,7 @@ from e16_app.models import (
     User, Course, Lesson, Enrollment, Quiz, Question, Choice, QuizAttempt, LearningLog, Submission, Certificate, Assignment
 )
 
-
 # ─────────────────────── Fixtures ───────────────────────
-
-@pytest.fixture
-def app():
-    app = create_app()
-    app.config.update({
-        "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "WTF_CSRF_ENABLED": False,
-        "SECRET_KEY": "test-key-scenarios"
-    })
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.drop_all()
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
-
 
 @pytest.fixture
 def seeded_db(app):
@@ -187,7 +166,6 @@ def seeded_db(app):
         db.session.add(cert)
         db.session.commit()
 
-
 # ─────────────────────── 12 Scenarios ───────────────────────
 
 def test_scenario_1_unenrolled_student_view_lessons(client, seeded_db):
@@ -199,7 +177,6 @@ def test_scenario_1_unenrolled_student_view_lessons(client, seeded_db):
     assert response.status_code == 302  # Correctly redirects to courses listing
     assert "courses" in response.headers.get("Location", "")
 
-
 def test_scenario_2_cross_teacher_course_modification(client, seeded_db):
     """Scenario 2: Teacher B cannot edit Teacher A's course."""
     with client.session_transaction() as sess:
@@ -208,7 +185,6 @@ def test_scenario_2_cross_teacher_course_modification(client, seeded_db):
     response = client.get("/teacher/courses/c-py/edit")  # Course owned by teacher_a
     assert response.status_code == 302  # Correctly redirects to manage dashboard
     assert "manage" in response.headers.get("Location", "")
-
 
 def test_scenario_3_cross_student_submission_download(client, app, seeded_db):
     """Scenario 3: Student A cannot download Student B's assignment submission."""
@@ -225,7 +201,6 @@ def test_scenario_3_cross_student_submission_download(client, app, seeded_db):
     response = client.get("/submissions/sub-s2-scen3/download")
     assert response.status_code == 302  # Correctly redirects to student dashboard
 
-
 def test_scenario_4_quiz_attempt_limit_enforced(client, seeded_db):
     """Scenario 4: Student 2 has exhausted 3/3 attempts, blocking more."""
     with client.session_transaction() as sess:
@@ -234,7 +209,6 @@ def test_scenario_4_quiz_attempt_limit_enforced(client, seeded_db):
     response = client.get("/learn/c-py/quiz/qz-1")
     assert response.status_code == 302  # Blocks taking quiz and redirects to learning page
     assert "learn/c-py" in response.headers.get("Location", "")
-
 
 def test_scenario_5_quiz_past_due_date_blocked(client, seeded_db):
     """Scenario 5: Quiz past due date is blocked."""
@@ -245,7 +219,6 @@ def test_scenario_5_quiz_past_due_date_blocked(client, seeded_db):
     assert response.status_code == 302  # Blocks taking expired quiz
     assert "learn/c-py" in response.headers.get("Location", "")
 
-
 def test_scenario_6_enrollment_pending_blocks_lessons(client, seeded_db):
     """Scenario 6: Pending payment students are redirected to checkout."""
     with client.session_transaction() as sess:
@@ -255,7 +228,6 @@ def test_scenario_6_enrollment_pending_blocks_lessons(client, seeded_db):
     assert response.status_code == 302
     assert "checkout" in response.headers.get("Location", "")  # Redirected to checkout QR page
 
-
 def test_scenario_7_certificate_issued_only_at_100_percent(client, app, seeded_db):
     """Scenario 7: u-s1 with 5/8 lessons cannot generate/find certificate."""
     with app.app_context():
@@ -263,14 +235,12 @@ def test_scenario_7_certificate_issued_only_at_100_percent(client, app, seeded_d
         cert = db.session.query(Certificate).filter_by(user_id="u-s1", course_id="c-py").first()
         assert cert is None
 
-
 def test_scenario_8_certificate_of_soft_deleted_course_remains_valid(client, seeded_db):
     """Scenario 8: Certificate of a soft-deleted course remains publicly valid."""
     # c-del is soft-deleted (is_deleted=True, status='archived')
     # Let's link certificate to c-del instead
     response = client.get("/certificates/cert-code-sd-py")
     assert response.status_code == 200  # Returns 200 with masked name!
-
 
 def test_scenario_9_admin_approves_pending_course(client, app, seeded_db):
     """Scenario 9: Admin approves pending course to publish it."""
@@ -283,7 +253,6 @@ def test_scenario_9_admin_approves_pending_course(client, app, seeded_db):
         c = db.session.get(Course, "c-pend")
         assert c.status == "approved"
 
-
 def test_scenario_10_teacher_export_gradebook(client, seeded_db):
     """Scenario 10: Teacher can export course gradebook without errors."""
     with client.session_transaction() as sess:
@@ -293,14 +262,12 @@ def test_scenario_10_teacher_export_gradebook(client, seeded_db):
     assert response.status_code == 200
     assert "text/csv" in response.headers.get("Content-Type", "")
 
-
 def test_scenario_11_inactive_user_cannot_login(client, seeded_db):
     """Scenario 11: Inactive user login attempt is blocked."""
     response = client.post("/auth/login", data={"email": "inactive@e16.local", "password": "TestPass123!"})
     assert response.status_code == 302
     # Verify they remain on or are sent back to the login route with error flash
     assert "login" in response.headers.get("Location", "")
-
 
 def test_scenario_12_double_enrollment_blocked(client, app, seeded_db):
     """Scenario 12: Cannot register or enroll in already active course."""
@@ -309,7 +276,6 @@ def test_scenario_12_double_enrollment_blocked(client, app, seeded_db):
         sess["_fresh"] = True
     response = client.post("/enroll/c-py")
     assert response.status_code == 302  # Already enrolled response
-
 
 # ─────────────────────── 10 Edge Cases ───────────────────────
 
@@ -330,7 +296,6 @@ def test_edge_1_score_boundaries(app, seeded_db):
         GradingService.grade_assignment_submission("sub-edge1", 120, "feedback", "u-ta")
         assert db.session.get(Submission, "sub-edge1").score == 100
 
-
 def test_edge_2_past_vs_future_assignment_deadline(client, app, seeded_db):
     """Edge Case 2: Past assignment submission is blocked, future is allowed."""
     with app.app_context():
@@ -350,7 +315,6 @@ def test_edge_2_past_vs_future_assignment_deadline(client, app, seeded_db):
     res_future = client.post("/learn/c-py/assignment/a-future", data={"text_content": "Valid submission"})
     assert res_future.status_code == 302
 
-
 def test_edge_3_user_last_login_null(client, app, seeded_db):
     """Edge Case 3: Users listing or dashboards do not crash when last_login is NULL."""
     with app.app_context():
@@ -364,7 +328,6 @@ def test_edge_3_user_last_login_null(client, app, seeded_db):
     response = client.get("/admin/users")
     assert response.status_code == 200  # Does not crash with 500
 
-
 def test_edge_4_course_with_zero_lessons(app, seeded_db):
     """Edge Case 4: Course completion calculations do not divide by zero if course has 0 lessons."""
     with app.app_context():
@@ -373,7 +336,6 @@ def test_edge_4_course_with_zero_lessons(app, seeded_db):
         rate = student_completion_rate("u-s1", "c-draft")
         assert rate == 0.0
 
-
 def test_edge_5_quiz_with_zero_questions(app, seeded_db):
     """Edge Case 5: Quiz grading calculations do not divide by zero if quiz has 0 questions."""
     with app.app_context():
@@ -381,7 +343,6 @@ def test_edge_5_quiz_with_zero_questions(app, seeded_db):
         # qz-3 has 0 questions
         attempt = GradingService.grade_quiz_attempt("u-s1", "qz-3", {})
         assert attempt.score == 0
-
 
 def test_edge_6_csv_import_duplicate_email(client, seeded_db):
     """Edge Case 6: CSV import gracefully skips duplicate email rows instead of crashing."""
@@ -396,11 +357,9 @@ def test_edge_6_csv_import_duplicate_email(client, seeded_db):
     assert response.status_code == 200
     assert b"Email" in response.data or b"Th\xc3\xa0nh c\xc3\xb4ng" in response.data
 
-
 def test_edge_7_file_upload_limit(app):
     """Edge Case 7: Flask upload limit is set properly (MAX_CONTENT_LENGTH guard)."""
     assert app.config["MAX_CONTENT_LENGTH"] == 16 * 1024 * 1024  # 16MB standard limit
-
 
 def test_edge_8_concurrent_quiz_submit(app, seeded_db):
     """Edge Case 8: Prevents attempts exceeding limit (u-s2 is blocked)."""
@@ -408,7 +367,6 @@ def test_edge_8_concurrent_quiz_submit(app, seeded_db):
         from e16_app.services import QuizService
         attempts = QuizService.get_attempt_count("u-s2", "qz-1")
         assert attempts >= 3
-
 
 def test_edge_9_password_reset_token_single_use(client, app, seeded_db):
     """Edge Case 9: Password reset token is strictly single-use."""
@@ -425,7 +383,6 @@ def test_edge_9_password_reset_token_single_use(client, app, seeded_db):
     # Try using the same token again
     res2 = client.post("/auth/reset-password/unique-reset-token", data={"password": "AnotherSecret123!"})
     assert res2.status_code == 302  # Fails and redirects back to login/forgot password with error
-
 
 def test_edge_10_soft_delete_user_learning_logs_remain(client, app, seeded_db):
     """Edge Case 10: Soft deleting/deactivating a user preserves learning logs history."""

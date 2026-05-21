@@ -3,7 +3,7 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for, abort
 from flask_login import current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -100,8 +100,7 @@ def home():
 @bp.route("/register", methods=["GET", "POST"])
 def register():
     """Registration is disabled — accounts are created by Học vụ or Admin."""
-    flash("Đăng ký tài khoản đã được tắt. Vui lòng liên hệ bộ phận Học vụ để được cấp tài khoản.", "info")
-    return redirect(url_for("auth.login"))
+    abort(410)
 
 
 @bp.route("/login", methods=["GET", "POST"])

@@ -4,19 +4,6 @@ from e16_app import create_app, db
 from e16_app.models import User, Quiz, Question, Choice, Assignment, Submission
 from e16_app.services import GradingService
 
-@pytest.fixture
-def app():
-    app = create_app()
-    app.config.update({
-        "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "WTF_CSRF_ENABLED": False
-    })
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.drop_all()
-
 def test_quiz_grading(app):
     """Verify that GradingService calculates scores correctly."""
     with app.app_context():
@@ -53,7 +40,6 @@ def test_quiz_grading(app):
         assert attempt2.score == 0
         assert attempt2.passed is False
 
-
 def test_quiz_grading_ignores_served_questions_from_other_quizzes(app):
     with app.app_context():
         u = User(email="served@e16.edu.vn", role="student", password_hash="dummy")
@@ -87,7 +73,6 @@ def test_quiz_grading_ignores_served_questions_from_other_quizzes(app):
 
         assert attempt.score == 0
         assert attempt.passed is False
-
 
 def test_assignment_grading_clamps_score_and_sets_status(app):
     with app.app_context():

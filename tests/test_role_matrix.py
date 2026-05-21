@@ -11,27 +11,7 @@ from werkzeug.security import generate_password_hash
 from e16_app import create_app, db
 from e16_app.models import User
 
-
 # ─────────────────────── Fixtures ───────────────────────
-
-@pytest.fixture
-def app():
-    app = create_app()
-    app.config.update({
-        "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "WTF_CSRF_ENABLED": False,
-    })
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.drop_all()
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
-
 
 @pytest.fixture
 def student_user(app):
@@ -41,7 +21,6 @@ def student_user(app):
         db.session.commit()
         return u.id
 
-
 @pytest.fixture
 def teacher_user(app):
     with app.app_context():
@@ -50,7 +29,6 @@ def teacher_user(app):
         db.session.commit()
         return u.id
 
-
 @pytest.fixture
 def admin_user(app):
     with app.app_context():
@@ -58,7 +36,6 @@ def admin_user(app):
         db.session.add(u)
         db.session.commit()
         return u.id
-
 
 # ─────────────────── Unauthenticated Access ───────────────────
 
@@ -77,7 +54,6 @@ def test_unauthenticated_user_cannot_access_protected_routes(client):
         assert response.status_code == 302
         assert "login" in response.headers.get("Location", "").lower()
 
-
 # ─────────────────── Student Role Boundaries ───────────────────
 
 def test_student_cannot_access_teacher_or_admin_routes(client, student_user):
@@ -95,7 +71,6 @@ def test_student_cannot_access_teacher_or_admin_routes(client, student_user):
         response = client.get(url)
         assert response.status_code == 302
 
-
 # ─────────────────── Teacher Role Boundaries ───────────────────
 
 def test_teacher_cannot_access_admin_routes(client, teacher_user):
@@ -111,7 +86,6 @@ def test_teacher_cannot_access_admin_routes(client, teacher_user):
     for url in forbidden_urls:
         response = client.get(url)
         assert response.status_code == 302
-
 
 # ─────────────────── Seed Route Access Protection ───────────────────
 
