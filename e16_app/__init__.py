@@ -81,13 +81,6 @@ def create_app():
             for tbl, col, ddl in _self_heal_cols:
                 ensure_column(tbl, col, ddl)
 
-            try:
-                db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_users_created_by ON users (created_by)"))
-                db.session.commit()
-            except Exception as ex:
-                db.session.rollback()
-                app.logger.warning(f"Self-healing users.created_by index failed: {str(ex)}")
-            
             # Auto-seed initial users, categories, and settings if DB is completely empty (no users)
             from .models import User, Category, SystemSetting
             try:

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
+import os
 import random
 from datetime import timedelta
 
@@ -27,8 +28,20 @@ COURSE_TOPICS = [
 
 
 def _random_between(start, end, rng):
+    if start.tzinfo is None and end.tzinfo is not None:
+        end = end.replace(tzinfo=None)
+    elif start.tzinfo is not None and end.tzinfo is None:
+        start = start.replace(tzinfo=None)
     total_seconds = max(1, int((end - start).total_seconds()))
     return start + timedelta(seconds=rng.randint(1, total_seconds))
+
+
+def _min_compatible(left, right):
+    if left.tzinfo is None and right.tzinfo is not None:
+        right = right.replace(tzinfo=None)
+    elif left.tzinfo is not None and right.tzinfo is None:
+        left = left.replace(tzinfo=None)
+    return min(left, right)
 
 
 def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
@@ -41,7 +54,24 @@ def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
     now = utcnow()
     ninety_days_ago = now - timedelta(days=90)
 
-    users = db.session.query(User).all()
+    if marker is None:
+        marker = SystemSetting(
+            key=DEMO_ENRICHMENT_KEY,
+            value=f"started:{now.isoformat()}",
+            description="Marks that random demo analytics data has been generated.",
+        )
+        db.session.add(marker)
+    else:
+        marker.value = f"started:{now.isoformat()}"
+    db.session.commit()
+
+    user_limit = max(1, int(os.getenv("E16_DEMO_USER_LIMIT", "120")))
+    users = (
+        db.session.query(User)
+        .order_by(User.last_login.is_(None).desc(), User.created_at.desc())
+        .limit(user_limit)
+        .all()
+    )
     teachers = [u for u in users if u.role == "teacher" and u.is_active]
     students = [u for u in users if u.role == "student" and u.is_active]
 
@@ -75,6 +105,8 @@ def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
                 created_at=log_time,
             ))
             login_logs += 1
+
+    db.session.commit()
 
     courses_created = 0
     lessons_created = 0
@@ -123,15 +155,15 @@ def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
                 ))
                 lessons_created += 1
 
-    db.session.flush()
+    db.session.commit()
 
     active_courses = db.session.query(Course).filter(
         Course.status.in_(["published", "running"]),
         Course.is_deleted == False,
     ).all()
     if students and active_courses:
-        for course in created_courses or active_courses[: min(40, len(active_courses))]:
-            sample_size = min(len(students), rng.randint(8, 30))
+        for course in (created_courses or active_courses[: min(12, len(active_courses))]):
+            sample_size = min(len(students), rng.randint(4, 12))
             for student in rng.sample(students, sample_size):
                 existing = db.session.query(Enrollment).filter_by(user_id=student.id, course_id=course.id).first()
                 if existing:
@@ -161,9 +193,11 @@ def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
                             user_id=student.id,
                             lesson_id=lesson.id,
                             action_type="complete",
-                            timestamp=min(log_time + timedelta(minutes=rng.randint(10, 90)), now),
+                            timestamp=_min_compatible(log_time + timedelta(minutes=rng.randint(10, 90)), now),
                         ))
                         learning_logs_created += 1
+
+            db.session.commit()
 
     today_lessons = db.session.query(Lesson).limit(50).all()
     if students and today_lessons:
@@ -177,16 +211,7 @@ def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
             ))
             learning_logs_created += 1
 
-    if marker is None:
-        marker = SystemSetting(
-            key=DEMO_ENRICHMENT_KEY,
-            value=now.isoformat(),
-            description="Marks that random demo analytics data has been generated.",
-        )
-        db.session.add(marker)
-    else:
-        marker.value = now.isoformat()
-
+    marker.value = f"completed:{now.isoformat()}"
     db.session.commit()
 
     if app:
