@@ -44,10 +44,53 @@ def _min_compatible(left, right):
     return min(left, right)
 
 
+def _load_state(marker, force):
+    if force or marker is None:
+        return {
+            "status": "running",
+            "last_user_id": None,
+            "last_teacher_id": None,
+            "processed_users": 0,
+            "processed_teachers": 0,
+            "user_done": False,
+            "teacher_done": False,
+        }
+    if marker.value and marker.value.startswith("completed:"):
+        return {"status": "completed"}
+    try:
+        state = json.loads(marker.value or "{}")
+        if state.get("status") == "completed":
+            return {"status": "completed"}
+        state.setdefault("status", "running")
+        state.setdefault("last_user_id", None)
+        state.setdefault("last_teacher_id", None)
+        state.setdefault("processed_users", 0)
+        state.setdefault("processed_teachers", 0)
+        state.setdefault("user_done", False)
+        state.setdefault("teacher_done", False)
+        return state
+    except Exception:
+        return {
+            "status": "running",
+            "last_user_id": None,
+            "last_teacher_id": None,
+            "processed_users": 0,
+            "processed_teachers": 0,
+            "user_done": False,
+            "teacher_done": False,
+        }
+
+
+def _save_state(marker, state):
+    marker.value = json.dumps(state, sort_keys=True)
+    db.session.commit()
+
+
 def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
-    """Create demo analytics data once for Vercel/prod preview databases."""
+    """Create demo analytics data across all users/teachers in small batches."""
     marker = db.session.query(SystemSetting).filter_by(key=DEMO_ENRICHMENT_KEY).first()
-    if marker and not force:
+    state = _load_state(marker, force)
+    if state.get("status") == "completed" and not force:
         return {"skipped": True, "reason": "already_enriched"}
 
     rng = random.Random(rng_seed)
@@ -57,22 +100,21 @@ def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
     if marker is None:
         marker = SystemSetting(
             key=DEMO_ENRICHMENT_KEY,
-            value=f"started:{now.isoformat()}",
+            value="{}",
             description="Marks that random demo analytics data has been generated.",
         )
         db.session.add(marker)
-    else:
-        marker.value = f"started:{now.isoformat()}"
-    db.session.commit()
+        db.session.commit()
 
-    user_limit = max(1, int(os.getenv("E16_DEMO_USER_LIMIT", "120")))
-    users = (
-        db.session.query(User)
-        .order_by(User.last_login.is_(None).desc(), User.created_at.desc())
-        .limit(user_limit)
-        .all()
-    )
-    teachers = [u for u in users if u.role == "teacher" and u.is_active]
+    user_batch_size = max(1, int(os.getenv("E16_DEMO_USER_BATCH_SIZE", os.getenv("E16_DEMO_USER_LIMIT", "120"))))
+    teacher_batch_size = max(1, int(os.getenv("E16_DEMO_TEACHER_BATCH_SIZE", "30")))
+
+    _save_state(marker, {**state, "status": "running", "started_at": now.isoformat()})
+
+    user_query = db.session.query(User).order_by(User.id.asc())
+    if state.get("last_user_id"):
+        user_query = user_query.filter(User.id > state["last_user_id"])
+    users = [] if state.get("user_done") else user_query.limit(user_batch_size).all()
     students = [u for u in users if u.role == "student" and u.is_active]
 
     user_updates = 0
@@ -107,12 +149,24 @@ def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
             login_logs += 1
 
     db.session.commit()
+    if users:
+        state["last_user_id"] = users[-1].id
+        state["processed_users"] = int(state.get("processed_users", 0)) + len(users)
+        if len(users) < user_batch_size:
+            state["user_done"] = True
+    else:
+        state["user_done"] = True
 
     courses_created = 0
     lessons_created = 0
     enrollments_created = 0
     learning_logs_created = 0
     created_courses = []
+
+    teacher_query = db.session.query(User).filter_by(role="teacher", is_active=True).order_by(User.id.asc())
+    if state.get("last_teacher_id"):
+        teacher_query = teacher_query.filter(User.id > state["last_teacher_id"])
+    teachers = [] if state.get("teacher_done") else teacher_query.limit(teacher_batch_size).all()
 
     for teacher_index, teacher in enumerate(teachers):
         existing_count = db.session.query(Course).filter_by(teacher_id=teacher.id, is_deleted=False).count()
@@ -156,11 +210,20 @@ def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
                 lessons_created += 1
 
     db.session.commit()
+    if teachers:
+        state["last_teacher_id"] = teachers[-1].id
+        state["processed_teachers"] = int(state.get("processed_teachers", 0)) + len(teachers)
+        if len(teachers) < teacher_batch_size:
+            state["teacher_done"] = True
+    else:
+        state["teacher_done"] = True
 
     active_courses = db.session.query(Course).filter(
         Course.status.in_(["published", "running"]),
         Course.is_deleted == False,
     ).all()
+    if not students:
+        students = db.session.query(User).filter_by(role="student", is_active=True).order_by(User.created_at.desc()).limit(100).all()
     if students and active_courses:
         for course in (created_courses or active_courses[: min(12, len(active_courses))]):
             sample_size = min(len(students), rng.randint(4, 12))
@@ -211,12 +274,20 @@ def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
             ))
             learning_logs_created += 1
 
-    marker.value = f"completed:{now.isoformat()}"
-    db.session.commit()
+    if state.get("user_done") and state.get("teacher_done"):
+        state["status"] = "completed"
+        state["completed_at"] = now.isoformat()
+    else:
+        state["status"] = "running"
+        state["updated_at"] = now.isoformat()
+    _save_state(marker, state)
 
     if app:
         app.logger.info(
-            "Demo data enrichment completed: users=%s login_logs=%s courses=%s lessons=%s enrollments=%s learning_logs=%s",
+            "Demo data enrichment batch: status=%s processed_users=%s processed_teachers=%s users=%s login_logs=%s courses=%s lessons=%s enrollments=%s learning_logs=%s",
+            state["status"],
+            state.get("processed_users", 0),
+            state.get("processed_teachers", 0),
             user_updates,
             login_logs,
             courses_created,
@@ -233,4 +304,7 @@ def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
         "lessons": lessons_created,
         "enrollments": enrollments_created,
         "learning_logs": learning_logs_created,
+        "status": state["status"],
+        "processed_users": state.get("processed_users", 0),
+        "processed_teachers": state.get("processed_teachers", 0),
     }

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import json
 from datetime import timedelta
 
 from werkzeug.security import generate_password_hash
@@ -37,11 +38,12 @@ def test_demo_enrichment_creates_login_history_and_teacher_courses(app):
         assert db.session.query(LearningLog).filter(LearningLog.timestamp >= today_start - timedelta(seconds=1)).count() > 0
 
         marker = db.session.query(SystemSetting).filter_by(key=DEMO_ENRICHMENT_KEY).one()
-        assert marker.value.startswith("completed:")
+        assert json.loads(marker.value)["status"] == "completed"
 
 
-def test_demo_enrichment_respects_user_limit(app, monkeypatch):
-    monkeypatch.setenv("E16_DEMO_USER_LIMIT", "5")
+def test_demo_enrichment_processes_all_users_across_batches(app, monkeypatch):
+    monkeypatch.setenv("E16_DEMO_USER_BATCH_SIZE", "5")
+    monkeypatch.setenv("E16_DEMO_TEACHER_BATCH_SIZE", "2")
 
     with app.app_context():
         pwd = generate_password_hash("pass123abc")
@@ -51,6 +53,14 @@ def test_demo_enrichment_respects_user_limit(app, monkeypatch):
         db.session.commit()
 
         result = enrich_demo_data_once(force=True, rng_seed=456)
-
         assert result["users"] == 5
-        assert db.session.query(AuditLog).filter_by(action="login_success").count() >= 5
+        assert result["status"] == "running"
+
+        for _ in range(10):
+            result = enrich_demo_data_once(rng_seed=456)
+            if result["status"] == "completed":
+                break
+
+        assert result["status"] == "completed"
+        assert result["processed_users"] == 21
+        assert db.session.query(AuditLog).filter_by(action="login_success").count() >= 21
