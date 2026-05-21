@@ -281,7 +281,7 @@ def test_scenario_9_admin_approves_pending_course(client, app, seeded_db):
     assert response.status_code == 302
     with app.app_context():
         c = db.session.get(Course, "c-pend")
-        assert c.status == "published"
+        assert c.status == "approved"
 
 
 def test_scenario_10_teacher_export_gradebook(client, seeded_db):

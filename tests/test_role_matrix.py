@@ -36,7 +36,7 @@ def client(app):
 @pytest.fixture
 def student_user(app):
     with app.app_context():
-        u = User(email="student@e16.test", password_hash=generate_password_hash("pass"), role="student")
+        u = User(email="student@e16.test", password_hash=generate_password_hash("pass"), role="student", must_change_password=False)
         db.session.add(u)
         db.session.commit()
         return u.id
@@ -45,7 +45,7 @@ def student_user(app):
 @pytest.fixture
 def teacher_user(app):
     with app.app_context():
-        u = User(email="teacher@e16.test", password_hash=generate_password_hash("pass"), role="teacher")
+        u = User(email="teacher@e16.test", password_hash=generate_password_hash("pass"), role="teacher", must_change_password=False)
         db.session.add(u)
         db.session.commit()
         return u.id
@@ -54,7 +54,7 @@ def teacher_user(app):
 @pytest.fixture
 def admin_user(app):
     with app.app_context():
-        u = User(email="admin@e16.test", password_hash=generate_password_hash("pass"), role="admin")
+        u = User(email="admin@e16.test", password_hash=generate_password_hash("pass"), role="admin", must_change_password=False)
         db.session.add(u)
         db.session.commit()
         return u.id
