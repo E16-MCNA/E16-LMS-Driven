@@ -179,6 +179,10 @@ def create_app():
                     if mutated:
                         db.session.commit()
                         app.logger.info("Vercel core demo accounts synchronized from E16_SEED_PASSWORD.")
+
+                if os.environ.get("VERCEL") and os.getenv("E16_DEMO_ENRICHMENT", "True") == "True":
+                    from .services.demo_data import enrich_demo_data_once
+                    enrich_demo_data_once(app)
             except Exception as e:
                 app.logger.error(f"Error during auto-seeding: {str(e)}")
 
