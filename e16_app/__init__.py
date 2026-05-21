@@ -39,7 +39,10 @@ def create_app():
     # Automatically create missing tables and seed basic settings in development/Vercel
     if app_env == "development" or os.environ.get("VERCEL"):
         with app.app_context():
-            db.create_all()
+            try:
+                db.create_all()
+            except Exception as e:
+                app.logger.warning(f"db.create_all() failed during startup: {str(e)}")
             # Self-healing column migration for price column
             try:
                 from sqlalchemy import text

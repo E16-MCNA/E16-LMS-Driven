@@ -17,16 +17,25 @@ def log_action(action, target_type=None, target_id=None, detail=None):
     # Detail can be a dict, convert to JSON
     detail_str = json.dumps(detail) if detail else None
     
-    log = AuditLog(
-        actor_id=actor_id,
-        action=action,
-        target_type=target_type,
-        target_id=target_id,
-        detail=detail_str,
-        ip_address=ip_address
-    )
-    db.session.add(log)
-    db.session.commit()
+    log = None
+    try:
+        log = AuditLog(
+            actor_id=actor_id,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            detail=detail_str,
+            ip_address=ip_address
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception as e:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        from flask import current_app
+        current_app.logger.error(f"Failed to write audit log to database: {str(e)}")
     
     # Push to Supabase
     try:
