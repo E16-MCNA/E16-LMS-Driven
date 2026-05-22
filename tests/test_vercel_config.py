@@ -69,6 +69,7 @@ def test_vercel_startup_self_heals_legacy_schema(monkeypatch, tmp_path):
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     monkeypatch.setenv("SECRET_KEY", "test-secret")
+    monkeypatch.setenv("E16_AUTO_HEAL_PROD", "True")
 
     import e16_app.config as config_module
 
@@ -98,6 +99,7 @@ def test_vercel_startup_syncs_core_demo_account_passwords(monkeypatch, tmp_path)
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     monkeypatch.setenv("SECRET_KEY", "test-secret")
+    monkeypatch.setenv("E16_AUTO_HEAL_PROD", "True")
     monkeypatch.setenv("E16_SEED_PASSWORD", "new-seed-password")
 
     import e16_app.config as config_module

@@ -37,12 +37,25 @@ def create_app():
     migrate.init_app(app, db)
     
     # Automatically create missing tables and seed basic settings in development/Vercel
-    if app_env == "development" or os.environ.get("VERCEL"):
+    allow_auto_heal = (app_env in ("development", "testing")) or (os.getenv("E16_AUTO_HEAL_PROD") == "True")
+    if allow_auto_heal:
         with app.app_context():
+            # Ensure payment_transactions table is created if it does not exist (Self-healing)
             try:
-                db.create_all()
+                from sqlalchemy import inspect
+                inspector = inspect(db.engine)
+                if "payment_transactions" not in inspector.get_table_names():
+                    from .models import PaymentTransaction
+                    PaymentTransaction.__table__.create(db.engine)
+                    app.logger.info("Self-healing: Created payment_transactions table.")
             except Exception as e:
-                app.logger.warning(f"db.create_all() failed during startup: {str(e)}")
+                app.logger.warning(f"Self-healing payment_transactions table creation failed: {str(e)}")
+
+            if app_env == "development" or os.environ.get("VERCEL"):
+                try:
+                    db.create_all()
+                except Exception as e:
+                    app.logger.warning(f"db.create_all() failed during startup: {str(e)}")
             # Self-healing column migrations for Vercel/database instances that have
             # not run Alembic yet. Use SQLAlchemy inspection instead of probing with
             # SELECT missing_column, which aborts the current PostgreSQL transaction.
@@ -119,20 +132,33 @@ def create_app():
                     # Seed Users
                     from werkzeug.security import generate_password_hash
                     seed_password = os.getenv("E16_SEED_PASSWORD") or "demo-password"
-                    users = [
-                        {"email": "admin@e16.local", "password_hash": generate_password_hash(seed_password), "role": "admin", "must_change_password": False},
-                        {"email": "teacher@e16.local", "password_hash": generate_password_hash(seed_password), "role": "teacher", "must_change_password": False},
-                        {"email": "student@e16.local", "password_hash": generate_password_hash(seed_password), "role": "student", "must_change_password": False},
-                        {"email": "hocvu@e16.local", "password_hash": generate_password_hash(seed_password), "role": "hoc_vu", "must_change_password": False},
-                    ]
+                    app_env = os.getenv("APP_ENV", os.getenv("FLASK_ENV", "production")).lower()
+                    is_local = not os.environ.get("VERCEL") and app_env in ("development", "testing")
+
+                    if is_local:
+                        users = [
+                            {"email": "admin_local@e16.local", "password_hash": generate_password_hash("admin_local_pass"), "role": "admin", "must_change_password": False},
+                            {"email": "teacher_local@e16.local", "password_hash": generate_password_hash("teacher_local_pass"), "role": "teacher", "must_change_password": False},
+                            {"email": "student_local@e16.local", "password_hash": generate_password_hash("student_local_pass"), "role": "student", "must_change_password": False},
+                            {"email": "hocvu_local@e16.local", "password_hash": generate_password_hash("hocvu_local_pass"), "role": "hoc_vu", "must_change_password": False},
+                        ]
+                    else:
+                        users = [
+                            {"email": "admin@e16.local", "password_hash": generate_password_hash(seed_password), "role": "admin", "must_change_password": False},
+                            {"email": "teacher@e16.local", "password_hash": generate_password_hash(seed_password), "role": "teacher", "must_change_password": False},
+                            {"email": "student@e16.local", "password_hash": generate_password_hash(seed_password), "role": "student", "must_change_password": False},
+                            {"email": "hocvu@e16.local", "password_hash": generate_password_hash(seed_password), "role": "hoc_vu", "must_change_password": False},
+                        ]
+
                     for u_data in users:
                         if not db.session.query(User).filter_by(email=u_data["email"]).first():
                             db.session.add(User(**u_data))
                             
                     for i in range(1, 6):
-                        email = f"student{i}@e16.local"
+                        email = f"student_local{i}@e16.local" if is_local else f"student{i}@e16.local"
+                        pwd = "student_local_pass" if is_local else seed_password
                         if not db.session.query(User).filter_by(email=email).first():
-                            db.session.add(User(email=email, password_hash=generate_password_hash(seed_password), role="student"))
+                            db.session.add(User(email=email, password_hash=generate_password_hash(pwd), role="student"))
                     
                     db.session.commit()
                     app.logger.info("Database auto-seeding completed successfully.")
@@ -183,8 +209,11 @@ def create_app():
                 if os.environ.get("VERCEL") and os.getenv("E16_DEMO_ENRICHMENT", "True") == "True":
                     from .services.demo_data import enrich_demo_data_once
                     enrich_demo_data_once(app)
+                else:
+                    from .services.demo_data import ensure_courses_have_quizzes_and_assignments
+                    ensure_courses_have_quizzes_and_assignments()
             except Exception as e:
-                app.logger.error(f"Error during auto-seeding: {str(e)}")
+                app.logger.error(f"Error during auto-seeding or self-healing: {str(e)}")
 
             default_settings = [
                 {"key": "site_name", "value": "E16 LMS", "description": "Tên hệ thống"},

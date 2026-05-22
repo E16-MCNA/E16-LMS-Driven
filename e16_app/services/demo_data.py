@@ -5,7 +5,7 @@ import random
 from datetime import timedelta
 
 from ..extensions import db
-from ..models import AuditLog, Course, Enrollment, LearningLog, Lesson, SystemSetting, User
+from ..models import AuditLog, Course, Enrollment, LearningLog, Lesson, SystemSetting, User, Quiz, Question, Choice, Assignment
 from ..time_utils import utcnow
 
 
@@ -91,6 +91,10 @@ def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
     marker = db.session.query(SystemSetting).filter_by(key=DEMO_ENRICHMENT_KEY).first()
     state = _load_state(marker, force)
     if state.get("status") == "completed" and not force:
+        try:
+            ensure_courses_have_quizzes_and_assignments()
+        except Exception:
+            pass
         return {"skipped": True, "reason": "already_enriched"}
 
     rng = random.Random(rng_seed)
@@ -209,6 +213,53 @@ def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
                 ))
                 lessons_created += 1
 
+            # Seed a Quiz for this course
+            quiz = Quiz(
+                course_id=course.id,
+                title=f"Trắc nghiệm cuối khóa: {topic}",
+                pass_score=80,
+                max_attempts=3,
+                is_published=True,
+                created_at=created_at + timedelta(days=1),
+            )
+            db.session.add(quiz)
+            db.session.flush()
+
+            # Seed Questions and Choices
+            q1 = Question(
+                quiz_id=quiz.id,
+                text=f"HTML là viết tắt của từ nào sau đây khi thiết kế web và {topic}?",
+                q_type="mcq",
+                sequence_order=1
+            )
+            db.session.add(q1)
+            db.session.flush()
+            db.session.add(Choice(question_id=q1.id, text="Hyper Text Markup Language", is_correct=True))
+            db.session.add(Choice(question_id=q1.id, text="Hyperlinks and Text Markup Language", is_correct=False))
+            db.session.add(Choice(question_id=q1.id, text="Home Technology Modern Language", is_correct=False))
+
+            q2 = Question(
+                quiz_id=quiz.id,
+                text=f"Đâu là yếu tố cốt lõi nhất cần chú ý khi tối ưu trải nghiệm người dùng?",
+                q_type="mcq",
+                sequence_order=2
+            )
+            db.session.add(q2)
+            db.session.flush()
+            db.session.add(Choice(question_id=q2.id, text="Sự đơn giản, rõ ràng và phản hồi nhanh chóng", is_correct=True))
+            db.session.add(Choice(question_id=q2.id, text="Sử dụng càng nhiều màu sắc sặc sỡ càng tốt", is_correct=False))
+
+            # Seed an Assignment for this course
+            assignment = Assignment(
+                course_id=course.id,
+                title=f"Bài tập thực hành: Thực chiến {topic}",
+                description=f"Hãy áp dụng các kỹ năng và kiến thức đã học trong khóa học {topic} để hoàn thành một bài thực hành thực tế ngắn và nộp báo cáo (hoặc nhập nội dung trả lời tại đây).",
+                allow_file=True,
+                allow_text=True,
+                created_at=created_at + timedelta(days=1),
+            )
+            db.session.add(assignment)
+
     db.session.commit()
     if teachers:
         state["last_teacher_id"] = teachers[-1].id
@@ -296,6 +347,13 @@ def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
             learning_logs_created,
         )
 
+    # Tự động đồng bộ các khóa học đang thiếu Quiz/Assignment
+    try:
+        ensure_courses_have_quizzes_and_assignments()
+    except Exception as e:
+        if app:
+            app.logger.warning(f"ensure_courses_have_quizzes_and_assignments failed in enrich_demo_data_once: {str(e)}")
+
     return {
         "skipped": False,
         "users": user_updates,
@@ -308,3 +366,71 @@ def enrich_demo_data_once(app=None, *, force=False, rng_seed=20260521):
         "processed_users": state.get("processed_users", 0),
         "processed_teachers": state.get("processed_teachers", 0),
     }
+
+
+def ensure_courses_have_quizzes_and_assignments():
+    """Ensure all existing courses in the database have at least one Quiz and one Assignment."""
+    courses = db.session.query(Course).filter(Course.is_deleted == False).all()
+    mutated = False
+    now = utcnow()
+
+    for course in courses:
+        # Check quiz
+        has_quiz = db.session.query(Quiz).filter_by(course_id=course.id).first()
+        if not has_quiz:
+            # Lấy tên chủ đề
+            topic = course.title.split(" - ")[0]
+            quiz = Quiz(
+                course_id=course.id,
+                title=f"Trắc nghiệm cuối khóa: {topic}",
+                pass_score=80,
+                max_attempts=3,
+                is_published=True,
+                created_at=course.created_at + timedelta(days=1) if course.created_at else now,
+            )
+            db.session.add(quiz)
+            db.session.flush()
+
+            # Tạo câu hỏi và lựa chọn mẫu
+            q1 = Question(
+                quiz_id=quiz.id,
+                text=f"HTML là viết tắt của từ nào sau đây khi thiết kế web và {topic}?",
+                q_type="mcq",
+                sequence_order=1
+            )
+            db.session.add(q1)
+            db.session.flush()
+            db.session.add(Choice(question_id=q1.id, text="Hyper Text Markup Language", is_correct=True))
+            db.session.add(Choice(question_id=q1.id, text="Hyperlinks and Text Markup Language", is_correct=False))
+            db.session.add(Choice(question_id=q1.id, text="Home Technology Modern Language", is_correct=False))
+
+            q2 = Question(
+                quiz_id=quiz.id,
+                text=f"Đâu là yếu tố cốt lõi nhất cần chú ý khi tối ưu trải nghiệm người dùng?",
+                q_type="mcq",
+                sequence_order=2
+            )
+            db.session.add(q2)
+            db.session.flush()
+            db.session.add(Choice(question_id=q2.id, text="Sự đơn giản, rõ ràng và phản hồi nhanh chóng", is_correct=True))
+            db.session.add(Choice(question_id=q2.id, text="Sử dụng càng nhiều màu sắc sặc sỡ càng tốt", is_correct=False))
+
+            mutated = True
+
+        # Check assignment
+        has_assignment = db.session.query(Assignment).filter_by(course_id=course.id).first()
+        if not has_assignment:
+            topic = course.title.split(" - ")[0]
+            assignment = Assignment(
+                course_id=course.id,
+                title=f"Bài tập thực hành: Thực chiến {topic}",
+                description=f"Hãy áp dụng các kỹ năng và kiến thức đã học trong khóa học để hoàn thành một bài thực hành thực tế ngắn và nộp báo cáo (hoặc nhập nội dung trả lời tại đây).",
+                allow_file=True,
+                allow_text=True,
+                created_at=course.created_at + timedelta(days=1) if course.created_at else now,
+            )
+            db.session.add(assignment)
+            mutated = True
+
+    if mutated:
+        db.session.commit()

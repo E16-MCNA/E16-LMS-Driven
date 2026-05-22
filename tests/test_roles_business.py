@@ -35,7 +35,7 @@ def _create_course(app, title, price):
             )
             db.session.add(teacher)
             db.session.commit()
-            
+
         course = Course(
             title=title,
             price=price,
@@ -130,7 +130,7 @@ def test_letan_create_student_account(client, app):
     }, follow_redirects=True)
 
     assert response.status_code == 200
-    
+
     with app.app_context():
         student = db.session.query(User).filter_by(email="newstudent@e16.test").first()
         assert student is not None
@@ -159,7 +159,7 @@ def test_letan_enroll_student_direct_cash(client, app):
     }, follow_redirects=True)
 
     assert response.status_code == 200
-    
+
     with app.app_context():
         # Verifies enrollment is immediately created as 'active' (bypassing pending)
         enrollment = db.session.query(Enrollment).filter_by(user_id=student_id, course_id=course_id).first()
@@ -199,7 +199,7 @@ def test_ketoan_payment_reconciliation_flow(client, app):
         enroll_1 = db.session.get(Enrollment, e1_id)
         assert enroll_1 is not None
         assert enroll_1.status == "active" # transitions to active
-        
+
         # Verify Audit Log
         audit = db.session.query(AuditLog).filter_by(action="payment_approved_by_ketoan").first()
         assert audit is not None
@@ -211,7 +211,8 @@ def test_ketoan_payment_reconciliation_flow(client, app):
 
     with app.app_context():
         enroll_2 = db.session.get(Enrollment, e2_id)
-        assert enroll_2 is None # is deleted from DB
+        assert enroll_2 is not None
+        assert enroll_2.status == "rejected"
 
         # Verify Audit Log
         audit = db.session.query(AuditLog).filter_by(action="payment_rejected_by_ketoan").first()
@@ -239,7 +240,8 @@ def test_ketoan_refund_revocation(client, app):
 
     with app.app_context():
         enroll = db.session.get(Enrollment, enroll_id)
-        assert enroll is None # access is revoked
+        assert enroll is not None
+        assert enroll.status == "refunded"
 
         # Verify audit log
         audit = db.session.query(AuditLog).filter_by(action="refund_processed_by_ketoan").first()
@@ -259,3 +261,91 @@ def test_ketoan_export_revenue_csv(client, app):
     assert "Mã Ghi Danh" in csv_data
     assert "Email Học Viên" in csv_data
     assert "Học Phí (VND)" in csv_data
+
+
+def test_payment_ledger_and_transactions(client, app):
+    """Verify that every creation, approval, rejection, and refund of an enrollment automatically records correctly in PaymentTransaction table."""
+    from e16_app.models import PaymentTransaction, Enrollment
+    from e16_app.services.payment import get_or_create_pending_enrollment
+
+    # Create users and course
+    _create_user(app, "letan@e16.test", "pass123", "le_tan")
+    _create_user(app, "ketoan@e16.test", "pass123", "ke_toan")
+    student_id = _create_user(app, "student@e16.test", "pass123", "student")
+    course_id = _create_course(app, "Ledger Course", 200000)
+
+    # 1. Test get_or_create_pending_enrollment creates a pending transaction
+    with app.app_context():
+        enrollment, was_expired = get_or_create_pending_enrollment(student_id, course_id)
+        assert enrollment.status == "pending_payment"
+        tx = db.session.query(PaymentTransaction).filter_by(enrollment_id=enrollment.id).first()
+        assert tx is not None
+        assert tx.status == "pending"
+        assert tx.amount == 200000
+        assert tx.payment_method == "mock_qr"
+        enroll_id = enrollment.id
+
+    # 2. Test Accountant approves payment updates transaction to approved
+    _login(client, "ketoan@e16.test", "pass123")
+    res = client.post(f"/ke-toan/reconciliation/approve/{enroll_id}", follow_redirects=True)
+    assert res.status_code == 200
+
+    with app.app_context():
+        enroll = db.session.get(Enrollment, enroll_id)
+        assert enroll.status == "active"
+        tx = db.session.query(PaymentTransaction).filter_by(enrollment_id=enroll_id, status="approved").first()
+        assert tx is not None
+        assert tx.payment_method == "bank_transfer"
+
+    # 3. Test Accountant refunds, creating a negative amount refunded transaction
+    res = client.post(f"/ke-toan/refund/{enroll_id}", follow_redirects=True)
+    assert res.status_code == 200
+
+    with app.app_context():
+        enroll = db.session.get(Enrollment, enroll_id)
+        assert enroll.status == "refunded"
+        tx_refund = db.session.query(PaymentTransaction).filter_by(enrollment_id=enroll_id, status="refunded").first()
+        assert tx_refund is not None
+        assert tx_refund.amount == -200000
+
+    # 4. Test Lễ tân counter enrollment creates an approved cash_at_frontdesk transaction
+    client.get("/auth/logout")
+    _login(client, "letan@e16.test", "pass123")
+
+    # Enroll student in a different course
+    course2_id = _create_course(app, "Frontdesk Course", 120000)
+    res = client.post("/le-tan/enroll", data={
+        "email": "student@e16.test",
+        "course_id": course2_id
+    }, follow_redirects=True)
+    assert res.status_code == 200
+
+    with app.app_context():
+        enroll2 = db.session.query(Enrollment).filter_by(user_id=student_id, course_id=course2_id).first()
+        assert enroll2 is not None
+        assert enroll2.status == "active"
+        tx = db.session.query(PaymentTransaction).filter_by(enrollment_id=enroll2.id).first()
+        assert tx is not None
+        assert tx.status == "approved"
+        assert tx.payment_method == "cash_at_frontdesk"
+        assert tx.amount == 120000
+
+    # 5. Test Accountant rejects payment, updating transaction to rejected
+    course3_id = _create_course(app, "Rejected Course", 180000)
+    with app.app_context():
+        enroll3, _ = get_or_create_pending_enrollment(student_id, course3_id)
+        enroll3_id = enroll3.id
+
+    client.get("/auth/logout")
+    _login(client, "ketoan@e16.test", "pass123")
+    res = client.post(f"/ke-toan/reconciliation/reject/{enroll3_id}", data={
+        "rejected_reason": "Wrong amount sent"
+    }, follow_redirects=True)
+    assert res.status_code == 200
+
+    with app.app_context():
+        enroll = db.session.get(Enrollment, enroll3_id)
+        assert enroll.status == "rejected"
+        tx = db.session.query(PaymentTransaction).filter_by(enrollment_id=enroll3_id, status="rejected").first()
+        assert tx is not None
+        assert tx.notes == "Wrong amount sent"

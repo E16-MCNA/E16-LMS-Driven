@@ -20,11 +20,13 @@ def get_or_create_pending_enrollment(user_id: str, course_id: str):
     If an expired, cancelled, rejected or refunded enrollment is found, it is
     reused as a new pending payment while preserving the same business record.
     """
+    from ..models import PaymentTransaction
     enrollment = db.session.query(Enrollment).filter_by(
         user_id=user_id, course_id=course_id
     ).first()
 
     was_expired = False
+    course = db.session.get(Course, course_id)
 
     if enrollment:
         if enrollment.status in ("active", "completed"):
@@ -34,14 +36,36 @@ def get_or_create_pending_enrollment(user_id: str, course_id: str):
         if enrollment.status == "pending_payment":
             time_diff = utcnow() - ensure_utc(enrollment.enrolled_at)
             if time_diff.total_seconds() > PAYMENT_TIMEOUT_SECONDS:
+                # Mark previous pending transaction as expired
+                old_tx = db.session.query(PaymentTransaction).filter_by(
+                    enrollment_id=enrollment.id,
+                    status="pending"
+                ).order_by(PaymentTransaction.created_at.desc()).first()
+                if old_tx:
+                    old_tx.status = "expired"
+                    old_tx.processed_at = utcnow()
+                    old_tx.notes = "Mã QR hết hạn thanh toán (quá 10 phút)"
+
                 enrollment.enrolled_at = utcnow()
                 enrollment.amount_paid = None
                 enrollment.payment_method = None
-                enrollment.tx_code = None
+                new_code = generate_tx_code()
+                enrollment.tx_code = new_code
                 enrollment.approved_by = None
                 enrollment.approved_at = None
                 enrollment.rejected_reason = None
                 enrollment.refunded_at = None
+
+                tx = PaymentTransaction(
+                    enrollment_id=enrollment.id,
+                    user_id=user_id,
+                    course_id=course_id,
+                    amount=course.price if course else 0,
+                    payment_method="mock_qr",
+                    tx_code=new_code,
+                    status="pending"
+                )
+                db.session.add(tx)
                 db.session.commit()
                 was_expired = True
             return enrollment, was_expired
@@ -52,22 +76,49 @@ def get_or_create_pending_enrollment(user_id: str, course_id: str):
             enrollment.enrolled_at = utcnow()
             enrollment.amount_paid = None
             enrollment.payment_method = None
-            enrollment.tx_code = None
+            new_code = generate_tx_code()
+            enrollment.tx_code = new_code
             enrollment.approved_by = None
             enrollment.approved_at = None
             enrollment.rejected_reason = None
             enrollment.refunded_at = None
+            db.session.flush()
+
+            tx = PaymentTransaction(
+                enrollment_id=enrollment.id,
+                user_id=user_id,
+                course_id=course_id,
+                amount=course.price if course else 0,
+                payment_method="mock_qr",
+                tx_code=new_code,
+                status="pending"
+            )
+            db.session.add(tx)
             db.session.commit()
             return enrollment, False
 
     if not enrollment:
+        new_code = generate_tx_code()
         enrollment = Enrollment(
             user_id=user_id,
             course_id=course_id,
             status="pending_payment",
             enrolled_at=utcnow(),
+            tx_code=new_code,
         )
         db.session.add(enrollment)
+        db.session.flush()
+
+        tx = PaymentTransaction(
+            enrollment_id=enrollment.id,
+            user_id=user_id,
+            course_id=course_id,
+            amount=course.price if course else 0,
+            payment_method="mock_qr",
+            tx_code=new_code,
+            status="pending"
+        )
+        db.session.add(tx)
         db.session.commit()
 
     return enrollment, False
@@ -90,6 +141,7 @@ def activate_enrollment(user_id: str, course_id: str):
     Activate a pending enrollment after successful payment.
     Returns (success: bool, message: str).
     """
+    from ..models import PaymentTransaction
     enrollment = db.session.query(Enrollment).filter_by(
         user_id=user_id, course_id=course_id
     ).first()
@@ -108,11 +160,20 @@ def activate_enrollment(user_id: str, course_id: str):
     if not ok:
         return False, message
 
+    tx = db.session.query(PaymentTransaction).filter_by(
+        enrollment_id=enrollment.id,
+        status="pending"
+    ).order_by(PaymentTransaction.created_at.desc()).first()
+
     # Verify expiration
     time_diff = utcnow() - ensure_utc(enrollment.enrolled_at)
     if time_diff.total_seconds() > PAYMENT_TIMEOUT_SECONDS:
         enrollment.status = "expired"
         enrollment.rejected_reason = "Mã QR hết hạn thanh toán"
+        if tx:
+            tx.status = "expired"
+            tx.processed_at = utcnow()
+            tx.notes = "Mã QR hết hạn thanh toán (quá 10 phút)"
         db.session.commit()
         return False, "Giao dịch thất bại: Mã QR đã hết hạn thanh toán (quá 10 phút)!"
 
@@ -120,21 +181,35 @@ def activate_enrollment(user_id: str, course_id: str):
     enrollment.amount_paid = course.price if course else 0
     enrollment.payment_method = "mock_qr"
     enrollment.approved_at = utcnow()
+    if tx:
+        tx.status = "approved"
+        tx.processed_at = utcnow()
+        tx.tx_code = enrollment.tx_code
     db.session.commit()
     return True, "Thanh toán thành công."
 
 
 def cancel_pending_enrollment(user_id: str, course_id: str) -> bool:
     """Cancel a pending payment enrollment without deleting the financial trail."""
+    from ..models import PaymentTransaction
     enrollment = db.session.query(Enrollment).filter_by(
         user_id=user_id, course_id=course_id, status="pending_payment"
     ).first()
     if enrollment:
         enrollment.status = "cancelled"
         enrollment.rejected_reason = "Học viên hủy checkout"
+        tx = db.session.query(PaymentTransaction).filter_by(
+            enrollment_id=enrollment.id,
+            status="pending"
+        ).order_by(PaymentTransaction.created_at.desc()).first()
+        if tx:
+            tx.status = "cancelled"
+            tx.processed_at = utcnow()
+            tx.notes = "Học viên hủy checkout"
         db.session.commit()
         return True
     return False
+
 
 
 def can_enroll(course, user) -> tuple[bool, str]:

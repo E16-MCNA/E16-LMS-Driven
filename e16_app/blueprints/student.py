@@ -165,7 +165,7 @@ def checkout(course_id):
     return render_template(
         "checkout.html",
         course=course,
-        tx_code=generate_tx_code(),
+        tx_code=enrollment.tx_code,
         seconds_left=get_seconds_remaining(enrollment),
         payment_mode=current_app.config.get("PAYMENT_MODE", "mock"),
     )
@@ -384,9 +384,11 @@ def take_quiz(course_id, quiz_id):
         logger.log("complete_quiz", user_id=current_user.id, user_email=current_user.email, resource_type="quiz", resource_id=quiz_id, metadata={"score": attempt.score, "course_id": course_id})
         return redirect(url_for("student.review_quiz", course_id=course_id, quiz_id=quiz_id, attempt_id=attempt.id))
 
-    # GET request - store start time in session
-    session[f"quiz_started_{quiz_id}"] = utcnow().isoformat()
-    session["quiz_started_at"] = utcnow().isoformat()
+    # GET request - store start time in session if not already present
+    if f"quiz_started_{quiz_id}" not in session:
+        session[f"quiz_started_{quiz_id}"] = utcnow().isoformat()
+    if "quiz_started_at" not in session:
+        session["quiz_started_at"] = utcnow().isoformat()
     questions = QuizService.prepare_shuffled_questions(quiz_id)
     return render_template("take_quiz.html", quiz=quiz, questions=questions, course_id=course_id)
 

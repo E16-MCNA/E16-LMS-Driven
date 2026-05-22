@@ -36,9 +36,9 @@ def list_users():
     page, per_page = get_pagination()
     sort_by = request.args.get("sort_by", "created_at")
     order = request.args.get("order", "desc")
-    
+
     query = db.session.query(User)
-    
+
     # Map sort column safely
     if sort_by == "role":
         col = User.role
@@ -47,19 +47,19 @@ def list_users():
     else:
         sort_by = "created_at"
         col = User.created_at
-        
+
     if order == "asc":
         query = query.order_by(col.asc())
     else:
         order = "desc"
         query = query.order_by(col.desc())
-        
+
     pagination = paginate_query(query, page, per_page)
     return render_template(
-        "admin_users.html", 
-        users=pagination["items"], 
-        pagination=pagination, 
-        sort_by=sort_by, 
+        "admin_users.html",
+        users=pagination["items"],
+        pagination=pagination,
+        sort_by=sort_by,
         order=order
     )
 
@@ -105,7 +105,7 @@ def toggle_user_status(user_id):
     if user_id == current_user.id:
         flash("Bạn không thể tự vô hiệu hóa tài khoản của chính mình.", "error")
         return redirect(url_for("admin.list_users"))
-        
+
     user = db.session.get(User, user_id)
     if user:
         user.is_active = not user.is_active
@@ -132,14 +132,14 @@ def create_category():
     icon = request.form.get("icon", "📚")
     description = request.form.get("description", "")
     slug = slugify(name)
-    
+
     # Ensure unique slug
     base_slug = slug
     counter = 1
     while db.session.query(Category).filter_by(slug=slug).first():
         slug = f"{base_slug}-{counter}"
         counter += 1
-        
+
     cat = Category(name=name, slug=slug, icon=icon, description=description)
     db.session.add(cat)
     db.session.commit()
@@ -170,7 +170,7 @@ def delete_category(cat_id):
     if course_count > 0:
         flash(f"Không thể xóa danh mục này vì đang có {course_count} khóa học sử dụng.", "error")
         return redirect(url_for("admin.list_categories"))
-        
+
     cat = db.session.get(Category, cat_id)
     if cat:
         db.session.delete(cat)
@@ -195,7 +195,7 @@ def update_settings():
         setting = db.session.query(SystemSetting).filter_by(key=key).first()
         if setting:
             setting.value = value
-            
+
     db.session.commit()
     flush_settings_cache()
     log_action("settings_updated")
@@ -213,13 +213,143 @@ def view_audit_log():
     pagination = paginate_query(query, page, per_page)
     return render_template("admin_audit_log.html", logs=pagination["items"], pagination=pagination)
 
-# --- User Import (Phase 2) ---
+# --- User Import & Creation (Phase 2) ---
+
+def _gen_temp_password(length: int = 10) -> str:
+    """Generate a random temporary password."""
+    chars = string.ascii_letters + string.digits
+    return "".join(random.choices(chars, k=length))
+
+
+def _send_welcome_email(email: str, temp_password: str, role: str):
+    """Try to send a welcome email.  Silently falls back to logger."""
+    from ..urls import app_url_for
+    try:
+        if current_app.config.get("MAIL_USERNAME"):
+            from ..services.mail import send_email
+            send_email(
+                to=email,
+                subject="E16 LMS — Tài khoản mới",
+                template_name="welcome_account",
+                email=email,
+                temp_password=temp_password,
+                role=role,
+                login_url=app_url_for("auth.login"),
+                site_name=current_app.config.get("SITE_NAME", "E16 LMS"),
+            )
+        else:
+            if current_app.debug:
+                current_app.logger.debug(
+                    f"Welcome email for {email}: temp_password={temp_password}"
+                )
+    except Exception as e:
+        current_app.logger.error(f"Failed to send welcome email to {email}: {e}")
+
+
+@bp.route("/users/create", methods=["GET", "POST"])
+@login_required
+@role_required("admin")
+def create_user():
+    from werkzeug.security import generate_password_hash
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        role = request.form.get("role", "").strip().lower()
+        phone = request.form.get("phone", "").strip() or None
+        course_id = request.form.get("course_id", "").strip() or None
+
+        if not email or "@" not in email:
+            flash("Email không hợp lệ.", "error")
+            courses = db.session.query(Course).filter_by(is_deleted=False).all()
+            return render_template("admin_create_user.html", courses=courses)
+
+        if role not in VALID_ROLES:
+            flash("Vai trò không hợp lệ.", "error")
+            courses = db.session.query(Course).filter_by(is_deleted=False).all()
+            return render_template("admin_create_user.html", courses=courses)
+
+        exists = db.session.query(User).filter_by(email=email).first()
+        if exists:
+            flash("Email này đã được sử dụng.", "error")
+            courses = db.session.query(Course).filter_by(is_deleted=False).all()
+            return render_template("admin_create_user.html", courses=courses)
+
+        temp_pass = _gen_temp_password()
+        hashed = generate_password_hash(temp_pass)
+
+        user = User(
+            email=email,
+            password_hash=hashed,
+            temp_password_hash=hashed,
+            role=role,
+            phone=phone,
+            must_change_password=True,
+            created_by=current_user.id,
+            is_active=True,
+        )
+        db.session.add(user)
+        db.session.flush()
+
+        if course_id and role == "student":
+            course = db.session.get(Course, course_id)
+            if course and not course.is_deleted and course.status in ("published", "running"):
+                from ..services.payment import can_enroll
+                from ..time_utils import utcnow
+                ok, msg = can_enroll(course, user)
+                if ok:
+                    existing = db.session.query(Enrollment).filter_by(
+                        user_id=user.id, course_id=course_id
+                    ).first()
+                    if not existing:
+                        enroll = Enrollment(
+                            user_id=user.id,
+                            course_id=course_id,
+                            status="active",
+                            amount_paid=course.price if course else 0,
+                            payment_method="direct_admin",
+                            approved_by=current_user.id,
+                            approved_at=utcnow(),
+                        )
+                        db.session.add(enroll)
+                        db.session.flush()
+
+                        from ..models import PaymentTransaction
+                        tx = PaymentTransaction(
+                            enrollment_id=enroll.id,
+                            user_id=user.id,
+                            course_id=course_id,
+                            amount=course.price if course else 0,
+                            payment_method="direct_admin",
+                            status="approved",
+                            processed_by=current_user.id,
+                            processed_at=utcnow(),
+                            notes="Admin ghi danh trực tiếp"
+                        )
+                        db.session.add(tx)
+                else:
+                    flash(f"Không thể ghi danh vào khóa học: {msg}", "warning")
+
+        db.session.commit()
+        _send_welcome_email(email, temp_pass, role)
+
+        log_action("create_user_by_admin", "User", user.id, {
+            "email": email,
+            "role": role,
+            "actor": current_user.email
+        })
+
+        flash(f"Tạo tài khoản thành công cho {email}. Mật khẩu tạm: {temp_pass}", "success")
+        return redirect(url_for("admin.list_users"))
+
+    courses = db.session.query(Course).filter(Course.status.in_(["published", "running"]), Course.is_deleted == False).all()
+    return render_template("admin_create_user.html", courses=courses)
+
 
 @bp.route("/users/import")
 @login_required
 @role_required("admin")
 def import_users_view():
     return render_template("admin_import_users.html")
+
 
 @bp.post("/users/import")
 @login_required
@@ -248,14 +378,14 @@ def import_users():
     if not required_headers.issubset(headers):
         flash("CSV phải có header bắt buộc: email, role.", "error")
         return redirect(url_for("admin.import_users_view"))
-    
+
     success_count = 0
     error_count = 0
     results = []
     max_rows = int(os.getenv("CSV_IMPORT_MAX_ROWS", "5000"))
-    
+
     from werkzeug.security import generate_password_hash
-    
+
     for index, row in enumerate(csv_input, start=1):
         if index > max_rows:
             error_count += 1
@@ -265,8 +395,9 @@ def import_users():
         email = (row.get("email") or "").strip().lower()
         role = (row.get("role") or "student").strip().lower()
         phone = (row.get("phone") or "").strip() or None
+        course_id = (row.get("course_id") or "").strip() or None
         is_active_raw = (row.get("is_active") or "true").strip().lower()
-        
+
         if not email or "@" not in email:
             error_count += 1
             results.append({"email": email, "status": "Lỗi", "reason": "Email không hợp lệ"})
@@ -276,19 +407,20 @@ def import_users():
             error_count += 1
             results.append({"email": email, "status": "Lỗi", "reason": "Role không hợp lệ"})
             continue
-            
+
         exists = db.session.query(User).filter_by(email=email).first()
         if exists:
             error_count += 1
             results.append({"email": email, "status": "Bỏ qua", "reason": "Email đã tồn tại"})
             continue
-            
-        # Generate random password
-        temp_pass = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
-        
+
+        temp_pass = _gen_temp_password()
+        hashed = generate_password_hash(temp_pass)
+
         user = User(
             email=email,
-            password_hash=generate_password_hash(temp_pass),
+            password_hash=hashed,
+            temp_password_hash=hashed,
             role=role,
             phone=phone,
             is_active=is_active_raw not in {"false", "0", "no", "inactive"},
@@ -296,12 +428,53 @@ def import_users():
             created_by=current_user.id,
         )
         db.session.add(user)
+        db.session.flush()
+
+        # Auto-enroll student if course_id provided
+        if course_id and role == "student":
+            course = db.session.get(Course, course_id)
+            if course and not course.is_deleted and course.status in ("published", "running"):
+                from ..services.payment import can_enroll
+                from ..time_utils import utcnow
+                ok, msg = can_enroll(course, user)
+                if ok:
+                    existing = db.session.query(Enrollment).filter_by(
+                        user_id=user.id, course_id=course_id
+                    ).first()
+                    if not existing:
+                        enroll = Enrollment(
+                            user_id=user.id,
+                            course_id=course_id,
+                            status="active",
+                            amount_paid=course.price if course else 0,
+                            payment_method="direct_admin",
+                            approved_by=current_user.id,
+                            approved_at=utcnow(),
+                        )
+                        db.session.add(enroll)
+                        db.session.flush()
+
+                        from ..models import PaymentTransaction
+                        tx = PaymentTransaction(
+                            enrollment_id=enroll.id,
+                            user_id=user.id,
+                            course_id=course_id,
+                            amount=course.price if course else 0,
+                            payment_method="direct_admin",
+                            status="approved",
+                            processed_by=current_user.id,
+                            processed_at=utcnow(),
+                            notes="Admin import bulk enrollment"
+                        )
+                        db.session.add(tx)
+
+        _send_welcome_email(email, temp_pass, role)
         success_count += 1
         results.append({"email": email, "temp_pass": temp_pass, "status": "Thành công"})
-        
+
     db.session.commit()
     log_action("bulk_import", detail={"success": success_count, "errors": error_count})
-    
+
     flash(f"Import hoàn tất: {success_count} thành công, {error_count} lỗi/bỏ qua.", "success")
     return render_template("admin_import_results.html", results=results)
 
@@ -324,6 +497,7 @@ def approve_course(course_id):
     from ..services.course_lifecycle import transition_course, InvalidTransitionError
     try:
         transition_course(course_id, "approved", current_user.id)
+        transition_course(course_id, "published", current_user.id)
         flash("Đã duyệt khóa học.", "success")
     except InvalidTransitionError as e:
         flash(str(e), "error")
@@ -388,7 +562,7 @@ def seed_system():
     for c_data in cats:
         if not db.session.query(Category).filter_by(slug=c_data["slug"]).first():
             db.session.add(Category(**c_data))
-            
+
     # Seed Settings
     settings = [
         {"key": "site_name", "value": "E16 LMS", "description": "Tên nền tảng hiển thị trên tiêu đề và sidebar."},
@@ -402,20 +576,32 @@ def seed_system():
 
     # Seed Users — read password from env var, never hardcode
     from werkzeug.security import generate_password_hash
-    users = [
-        {"email": "admin@e16.local", "password_hash": generate_password_hash(seed_password), "role": "admin", "must_change_password": False},
-        {"email": "teacher@e16.local", "password_hash": generate_password_hash(seed_password), "role": "teacher", "must_change_password": False},
-        {"email": "student@e16.local", "password_hash": generate_password_hash(seed_password), "role": "student", "must_change_password": False},
-        {"email": "hocvu@e16.local", "password_hash": generate_password_hash(seed_password), "role": "hoc_vu", "must_change_password": False},
-    ]
+    is_local = not os.environ.get("VERCEL") and app_env in ("development", "testing")
+
+    if is_local:
+        users = [
+            {"email": "admin_local@e16.local", "password_hash": generate_password_hash("admin_local_pass"), "role": "admin", "must_change_password": False},
+            {"email": "teacher_local@e16.local", "password_hash": generate_password_hash("teacher_local_pass"), "role": "teacher", "must_change_password": False},
+            {"email": "student_local@e16.local", "password_hash": generate_password_hash("student_local_pass"), "role": "student", "must_change_password": False},
+            {"email": "hocvu_local@e16.local", "password_hash": generate_password_hash("hocvu_local_pass"), "role": "hoc_vu", "must_change_password": False},
+        ]
+    else:
+        users = [
+            {"email": "admin@e16.local", "password_hash": generate_password_hash(seed_password), "role": "admin", "must_change_password": False},
+            {"email": "teacher@e16.local", "password_hash": generate_password_hash(seed_password), "role": "teacher", "must_change_password": False},
+            {"email": "student@e16.local", "password_hash": generate_password_hash(seed_password), "role": "student", "must_change_password": False},
+            {"email": "hocvu@e16.local", "password_hash": generate_password_hash(seed_password), "role": "hoc_vu", "must_change_password": False},
+        ]
+
     for u_data in users:
         if not db.session.query(User).filter_by(email=u_data["email"]).first():
             db.session.add(User(**u_data))
-            
+
     for i in range(1, 6):
-        email = f"student{i}@e16.local"
+        email = f"student_local{i}@e16.local" if is_local else f"student{i}@e16.local"
+        pwd = "student_local_pass" if is_local else seed_password
         if not db.session.query(User).filter_by(email=email).first():
-            db.session.add(User(email=email, password_hash=generate_password_hash(seed_password), role="student"))
+            db.session.add(User(email=email, password_hash=generate_password_hash(pwd), role="student"))
 
     db.session.commit()
     flush_settings_cache()
@@ -430,22 +616,22 @@ def list_reports():
     from ..models import ContentReport, User
     page, per_page = get_pagination(default_per_page=20, max_per_page=100)
     status_filter = request.args.get("status", "pending")
-    
+
     query = db.session.query(ContentReport, User).join(User, User.id == ContentReport.reporter_id)
     if status_filter:
         query = query.filter(ContentReport.status == status_filter)
-        
+
     query = query.order_by(ContentReport.created_at.desc())
     pagination = paginate_query(query, page, per_page)
-    
+
     # Optimized: batch-fetch all threads/replies/authors to avoid N+1 queries
     from ..models import ForumThread, ForumReply
     items = pagination["items"]
-    
+
     # Collect all target IDs by type
     thread_ids = {r.target_id for r, _ in items if r.target_type == "thread"}
     reply_ids = {r.target_id for r, _ in items if r.target_type == "reply"}
-    
+
     # Batch fetch in 2 queries max
     threads_map = {}
     replies_map = {}
@@ -461,7 +647,7 @@ def list_reports():
         if missing_thread_ids:
             for t in db.session.query(ForumThread).filter(ForumThread.id.in_(missing_thread_ids)).all():
                 threads_map[t.id] = t
-    
+
     # Batch fetch all author users
     author_ids = set()
     for t in threads_map.values():
@@ -472,7 +658,7 @@ def list_reports():
     if author_ids:
         for u in db.session.query(User).filter(User.id.in_(author_ids)).all():
             users_map[u.id] = u
-    
+
     enriched_items = []
     for report, reporter in items:
         target_body = ""
@@ -493,7 +679,7 @@ def list_reports():
                 target_author = author.email if author else "Khong ro"
                 thread = threads_map.get(reply.thread_id)
                 course_id = thread.course_id if thread else ""
-                
+
         enriched_items.append({
             "report": report,
             "reporter": reporter,
@@ -501,7 +687,7 @@ def list_reports():
             "target_author": target_author,
             "course_id": course_id
         })
-        
+
     return render_template(
         "admin_reports.html",
         items=enriched_items,
@@ -519,17 +705,17 @@ def resolve_report(report_id):
     if not report:
         flash("Không tìm thấy báo cáo.", "error")
         return redirect(url_for("admin.list_reports"))
-        
+
     action = request.form.get("action")  # "hide" or "dismiss"
     if action not in ("hide", "dismiss"):
         flash("Hành động không hợp lệ.", "error")
         return redirect(url_for("admin.list_reports"))
-        
+
     report.status = "resolved" if action == "hide" else "dismissed"
     report.resolved_at = utcnow()
     report.resolved_by = current_user.id
     report.action_taken = action
-    
+
     if action == "hide":
         if report.target_type == "thread":
             thread = db.session.get(ForumThread, report.target_id)
@@ -541,7 +727,7 @@ def resolve_report(report_id):
             if reply:
                 reply.is_hidden = True
                 log_action("forum_reply_hidden_by_report", "ForumReply", reply.id)
-                
+
     db.session.commit()
     log_action("report_resolved", "ContentReport", report_id, {"action": action})
     flash("Đã xử lý báo cáo thành công.", "success")

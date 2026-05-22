@@ -24,8 +24,8 @@ bp = Blueprint("ke_toan", __name__, url_prefix="/ke-toan")
 @login_required
 @role_required("ke_toan", "admin")
 def dashboard():
-    # Total Revenue (sum of Course.price for active/completed enrollments)
-    total_rev = db.session.query(func.sum(Course.price)).select_from(Enrollment).join(
+    # Total Revenue (sum of func.coalesce(Enrollment.amount_paid, Course.price) for active/completed enrollments)
+    total_rev = db.session.query(func.sum(func.coalesce(Enrollment.amount_paid, Course.price))).select_from(Enrollment).join(
         Course, Enrollment.course_id == Course.id
     ).filter(
         Enrollment.status.in_(["active", "completed"]),
@@ -39,13 +39,13 @@ def dashboard():
     course_rev_rows = db.session.query(
         Course.title,
         func.count(Enrollment.id).label("sales_count"),
-        func.sum(Course.price).label("course_revenue")
+        func.sum(func.coalesce(Enrollment.amount_paid, Course.price)).label("course_revenue")
     ).select_from(Enrollment).join(
         Course, Enrollment.course_id == Course.id
     ).filter(
         Enrollment.status.in_(["active", "completed"]),
         Course.is_deleted == False
-    ).group_by(Course.id, Course.title).order_by(func.sum(Course.price).desc()).all()
+    ).group_by(Course.id, Course.title).order_by(func.sum(func.coalesce(Enrollment.amount_paid, Course.price)).desc()).all()
     
     # Recent 5 approved enrollments
     recent_transactions = (
@@ -61,7 +61,7 @@ def dashboard():
     start_date = now - timedelta(days=30)
     growth_rows = db.session.query(
         func.date(Enrollment.enrolled_at).label("date"),
-        func.sum(Course.price).label("daily_revenue")
+        func.sum(func.coalesce(Enrollment.amount_paid, Course.price)).label("daily_revenue")
     ).select_from(Enrollment).join(
         Course, Enrollment.course_id == Course.id
     ).filter(
@@ -117,9 +117,41 @@ def approve_payment(enroll_id):
     course = db.session.get(Course, enrollment.course_id)
     student = db.session.get(User, enrollment.user_id)
     
-    # Transition to active
+    # Transition to active and populate ledger columns
     enrollment.status = "active"
     enrollment.enrolled_at = utcnow()  # reset purchase/activation date to now
+    enrollment.amount_paid = course.price if course else 0
+    enrollment.payment_method = "bank_transfer"
+    enrollment.approved_by = current_user.id
+    enrollment.approved_at = utcnow()
+
+    # Financial Ledger entry
+    from ..models import PaymentTransaction
+    tx = db.session.query(PaymentTransaction).filter_by(
+        enrollment_id=enrollment.id,
+        status="pending"
+    ).order_by(PaymentTransaction.created_at.desc()).first()
+
+    if tx:
+        tx.status = "approved"
+        tx.payment_method = "bank_transfer"
+        tx.processed_by = current_user.id
+        tx.processed_at = utcnow()
+        tx.tx_code = enrollment.tx_code
+    else:
+        tx = PaymentTransaction(
+            enrollment_id=enrollment.id,
+            user_id=enrollment.user_id,
+            course_id=enrollment.course_id,
+            amount=course.price if course else 0,
+            payment_method="bank_transfer",
+            tx_code=enrollment.tx_code,
+            status="approved",
+            processed_by=current_user.id,
+            processed_at=utcnow()
+        )
+        db.session.add(tx)
+
     db.session.commit()
     
     log_action("payment_approved_by_ketoan", "Enrollment", enrollment.id, {
@@ -145,8 +177,39 @@ def reject_payment(enroll_id):
     course = db.session.get(Course, enrollment.course_id)
     student = db.session.get(User, enrollment.user_id)
     
-    # Delete the pending enrollment to release the lock
-    db.session.delete(enrollment)
+    reason = request.form.get("rejected_reason", "").strip() or "Bị từ chối bởi Kế toán"
+
+    # Transition status to rejected instead of hard deleting
+    enrollment.status = "rejected"
+    enrollment.rejected_reason = reason
+
+    # Financial Ledger entry
+    from ..models import PaymentTransaction
+    tx = db.session.query(PaymentTransaction).filter_by(
+        enrollment_id=enrollment.id,
+        status="pending"
+    ).order_by(PaymentTransaction.created_at.desc()).first()
+
+    if tx:
+        tx.status = "rejected"
+        tx.processed_by = current_user.id
+        tx.processed_at = utcnow()
+        tx.notes = reason
+    else:
+        tx = PaymentTransaction(
+            enrollment_id=enrollment.id,
+            user_id=enrollment.user_id,
+            course_id=enrollment.course_id,
+            amount=course.price if course else 0,
+            payment_method="bank_transfer",
+            tx_code=enrollment.tx_code,
+            status="rejected",
+            processed_by=current_user.id,
+            processed_at=utcnow(),
+            notes=reason
+        )
+        db.session.add(tx)
+
     db.session.commit()
     
     log_action("payment_rejected_by_ketoan", "Enrollment", enroll_id, {
@@ -155,7 +218,7 @@ def reject_payment(enroll_id):
         "actor": current_user.email
     })
     
-    flash(f"Đã xóa yêu cầu ghi danh chưa đóng tiền của học viên {student.email if student else ''} đối với khóa {course.title if course else ''}.", "info")
+    flash(f"Đã từ chối yêu cầu ghi danh của học viên {student.email if student else ''} đối với khóa {course.title if course else ''}.", "info")
     return redirect(url_for("ke_toan.reconciliation"))
 
 
@@ -186,14 +249,34 @@ def refund_enrollment(enroll_id):
     course = db.session.get(Course, enrollment.course_id)
     student = db.session.get(User, enrollment.user_id)
     
-    # Hard refund: delete the enrollment to revoke course access and subtract from revenue
-    db.session.delete(enrollment)
+    actual_amount = enrollment.amount_paid if enrollment.amount_paid is not None else (course.price if course else 0)
+
+    # Transition status to refunded instead of hard deleting
+    enrollment.status = "refunded"
+    enrollment.refunded_at = utcnow()
+
+    # Financial Ledger entry
+    from ..models import PaymentTransaction
+    tx = PaymentTransaction(
+        enrollment_id=enrollment.id,
+        user_id=enrollment.user_id,
+        course_id=enrollment.course_id,
+        amount=-actual_amount,
+        payment_method=enrollment.payment_method or "bank_transfer",
+        tx_code=enrollment.tx_code,
+        status="refunded",
+        processed_by=current_user.id,
+        processed_at=utcnow(),
+        notes="Hoàn tiền học phí"
+    )
+    db.session.add(tx)
+
     db.session.commit()
     
     log_action("refund_processed_by_ketoan", "Enrollment", enroll_id, {
         "student_email": student.email if student else "",
         "course_title": course.title if course else "",
-        "refund_amount": course.price if course else 0,
+        "refund_amount": actual_amount,
         "actor": current_user.email
     })
     
@@ -223,11 +306,12 @@ def export_revenue():
     for s in sales:
         course = db.session.get(Course, s.course_id)
         student = db.session.get(User, s.user_id)
+        amount = s.amount_paid if s.amount_paid is not None else (course.price if course else 0)
         cw.writerow([
             s.id,
             student.email if student else "N/A",
             course.title if course else "N/A",
-            course.price if course else 0,
+            amount,
             "Đã thanh toán" if s.status == "active" else "Hoàn thành khóa học",
             s.enrolled_at.strftime("%d/%m/%Y %H:%M:%S") if s.enrolled_at else ""
         ])

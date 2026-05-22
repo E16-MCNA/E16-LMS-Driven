@@ -6,14 +6,14 @@
 | --- | --- |
 | Sản phẩm | E16 LMS |
 | Loại tài liệu | Business Requirements Document (BRD) |
-| Phiên bản | 1.0 |
+| Phiên bản | 1.1 |
 | Ngày lập | 2026-05-18 |
 | Mục tiêu | Chuẩn hóa yêu cầu nghiệp vụ, phạm vi sản phẩm, tiêu chí nghiệm thu và các điều kiện bắt buộc để triển khai E16 LMS thành hệ thống production |
 | Nguồn phân tích | Toàn bộ repo hiện tại: Flask app, SQLAlchemy models, blueprints, services, templates, tests, Docker, migrations, seed/export scripts |
 
 ## 2. Tóm tắt điều hành
 
-E16 LMS là nền tảng quản lý học tập dành cho tổ chức giáo dục, trung tâm đào tạo hoặc doanh nghiệp có nhu cầu vận hành khóa học trực tuyến. Sản phẩm hiện hỗ trợ ba vai trò chính gồm Admin, Teacher và Student; các nghiệp vụ cốt lõi gồm đăng ký/đăng nhập, quản lý khóa học, duyệt khóa học, học bài, làm quiz, nộp assignment, chấm điểm, gradebook, transcript, chứng chỉ, thông báo, forum, analytics và export dữ liệu.
+E16 LMS là nền tảng quản lý học tập dành cho tổ chức giáo dục, trung tâm đào tạo hoặc doanh nghiệp có nhu cầu vận hành khóa học trực tuyến. Sản phẩm hiện hỗ trợ sáu vai trò gồm Admin, Học vụ, Lễ tân, Kế toán, Teacher và Student; các nghiệp vụ cốt lõi gồm cấp tài khoản, đăng nhập, quản lý khóa học, duyệt khóa học, ghi danh/thanh toán, học bài, làm quiz, nộp assignment, chấm điểm, gradebook, transcript, chứng chỉ, thông báo, forum, analytics và export dữ liệu.
 
 Mục tiêu production của E16 LMS là chuyển sản phẩm từ trạng thái có đủ chức năng MVP/near-production sang một hệ thống ổn định, bảo mật, có thể vận hành thật với dữ liệu người dùng thật, đo lường được, kiểm thử được, khôi phục được và tuân thủ yêu cầu bảo vệ dữ liệu.
 
@@ -22,20 +22,25 @@ Mục tiêu production của E16 LMS là chuyển sản phẩm từ trạng thá
 1. Cung cấp một LMS có thể triển khai cho trường học, trung tâm đào tạo hoặc đơn vị đào tạo nội bộ.
 2. Cho phép Teacher tự tạo, quản lý và theo dõi hiệu quả khóa học.
 3. Cho phép Admin kiểm soát người dùng, danh mục, cấu hình hệ thống, duyệt khóa học, audit log và dữ liệu phân tích.
-4. Cho phép Student tự đăng ký học, theo dõi tiến độ, làm bài kiểm tra, nộp bài, xem điểm và nhận chứng chỉ.
-5. Giảm chi phí vận hành đào tạo bằng tự động hóa các quy trình: enrollment, learning log, chấm quiz, thông báo, gradebook, transcript và certificate.
-6. Tạo nền tảng dữ liệu đủ tin cậy cho báo cáo học tập, phân tích hành vi và ra quyết định vận hành.
+4. Cho phép Học vụ duyệt khóa học trước khi phát hành theo quy trình học thuật.
+5. Cho phép Lễ tân tra cứu hồ sơ học viên, tạo tài khoản học viên và ghi danh trực tiếp tại quầy.
+6. Cho phép Kế toán đối soát thanh toán, duyệt giao dịch pending_payment, theo dõi doanh thu và xuất báo cáo tài chính.
+7. Cho phép Student đăng nhập bằng tài khoản đã được cấp, đăng ký học, theo dõi tiến độ, làm bài kiểm tra, nộp bài, xem điểm và nhận chứng chỉ.
+8. Giảm chi phí vận hành đào tạo bằng tự động hóa các quy trình: enrollment, learning log, chấm quiz, thông báo, gradebook, transcript và certificate.
+9. Tạo nền tảng dữ liệu đủ tin cậy cho báo cáo học tập, phân tích hành vi và ra quyết định vận hành.
 
 ## 4. Phạm vi sản phẩm
 
 ### 4.1. Trong phạm vi production
 
 - Xác thực người dùng bằng email/password và Google OAuth.
-- Phân quyền theo vai trò Admin, Teacher, Student.
-- Quản lý người dùng, trạng thái tài khoản, vai trò và import người dùng bằng CSV.
+- Phân quyền theo vai trò Admin, Học vụ, Lễ tân, Kế toán, Teacher, Student.
+- Quản lý người dùng, trạng thái tài khoản, vai trò, cấp tài khoản đơn lẻ và import người dùng bằng CSV.
 - Quản lý danh mục khóa học.
 - Teacher tạo khóa học, cập nhật nội dung, lessons, quizzes, assignments và gửi duyệt.
-- Admin duyệt hoặc từ chối khóa học trước khi publish.
+- Admin hoặc Học vụ duyệt hoặc từ chối khóa học trước khi publish.
+- Lễ tân tạo tài khoản học viên, tra cứu hồ sơ học viên và ghi danh trực tiếp tại quầy.
+- Kế toán đối soát thanh toán, duyệt/từ chối giao dịch chờ thanh toán, theo dõi doanh thu và xuất CSV tài chính.
 - Student tìm kiếm, lọc, đăng ký khóa học và học bài.
 - Ghi nhận learning logs, tính tiến độ học tập, streak và trạng thái hoàn thành.
 - Quiz tự động chấm điểm với MCQ, checkbox và fill-in-blank.
@@ -50,7 +55,7 @@ Mục tiêu production của E16 LMS là chuyển sản phẩm từ trạng thá
 
 ### 4.2. Ngoài phạm vi phiên bản production đầu tiên
 
-- Thanh toán, bán khóa học hoặc marketplace.
+- Marketplace nhiều người bán hoặc cổng thanh toán tự động hoàn chỉnh.
 - Livestream/classroom realtime.
 - Mobile native app.
 - SCORM/xAPI đầy đủ.
@@ -67,6 +72,9 @@ Các hạng mục ngoài phạm vi có thể được đưa vào roadmap sau khi
 | --- | --- | --- |
 | Chủ sản phẩm | Sản phẩm chạy được production, có giá trị thương mại/đào tạo | Quyết định phạm vi, ưu tiên roadmap, nghiệm thu |
 | Admin hệ thống | Quản trị người dùng, khóa học, danh mục, báo cáo và vận hành | Thiết lập hệ thống, duyệt nội dung, xử lý sự cố |
+| Học vụ | Kiểm soát quy trình học thuật và duyệt khóa học | Xem dashboard học vụ, duyệt/từ chối khóa học chờ review |
+| Lễ tân | Hỗ trợ học viên tại quầy | Tạo tài khoản học viên, cập nhật thông tin cơ bản, ghi danh trực tiếp |
+| Kế toán | Quản lý thanh toán và doanh thu | Duyệt/từ chối giao dịch chờ thanh toán, xử lý hoàn phí, xuất báo cáo doanh thu |
 | Teacher | Tạo và vận hành khóa học | Soạn lesson, quiz, assignment, chấm điểm, theo dõi lớp |
 | Student | Học tập và hoàn thành khóa học | Đăng ký khóa học, học bài, làm bài, xem kết quả |
 | Dev/DevOps | Đưa hệ thống vào production ổn định | CI/CD, hạ tầng, bảo mật, backup, monitoring |
@@ -82,7 +90,19 @@ Admin cần một bảng điều khiển tập trung để quản trị người
 
 Teacher cần tạo khóa học nhanh, thêm bài học bằng video/document URL, tạo quiz, tạo assignment, xem danh sách học viên, chấm bài, xuất điểm, xem gradebook và analytics để cải thiện nội dung.
 
-### 6.3. Student
+### 6.3. Học vụ
+
+Học vụ cần một màn hình tập trung để theo dõi khóa học chờ duyệt, kiểm tra thông tin khóa học và phê duyệt hoặc từ chối kèm lý do.
+
+### 6.4. Lễ tân
+
+Lễ tân cần tra cứu học viên nhanh, xem hồ sơ học tập cơ bản, tạo tài khoản học viên mới, cập nhật số điện thoại/trạng thái và ghi danh khóa học trực tiếp tại quầy.
+
+### 6.5. Kế toán
+
+Kế toán cần xem dashboard doanh thu, danh sách giao dịch chờ đối soát, phê duyệt hoặc từ chối thanh toán, xử lý hoàn phí và xuất CSV doanh thu.
+
+### 6.6. Student
 
 Student cần tìm khóa học, đăng ký học, xem bài học theo thứ tự, đánh dấu hoàn thành, làm quiz, nộp assignment, xem deadline, transcript, chứng chỉ và nhận thông báo khi có hoạt động mới.
 
@@ -94,15 +114,21 @@ Student cần tìm khóa học, đăng ký học, xem bài học theo thứ tự
 | --- | --- |
 | Backend | Flask 3, Flask-SQLAlchemy, Flask-Login, Flask-Migrate |
 | Frontend | Server-rendered Jinja templates, static CSS, Chart.js |
-| Database | SQLite cho dev/test, PostgreSQL cho production |
+| Database | SQLite cho dev/test, PostgreSQL cho production; Supabase PostgreSQL đang là lựa chọn triển khai thật |
 | Auth | Email/password, Google OAuth qua Authlib |
 | Email | Flask-Mail SMTP |
 | Rate limit | Flask-Limiter, memory/Redis storage |
 | Security headers | Flask-Talisman với CSP |
 | File storage | Local static uploads hoặc S3 |
 | Logging | App log, AuditLog DB, Supabase logger optional |
-| Deployment | Dockerfile multi-stage, docker-compose gồm web/db/redis |
+| Deployment | Vercel hiện dùng cho app đã deploy; Docker/docker-compose vẫn là đường chạy production hoặc staging khi cần backend riêng |
 | Tests | pytest cho auth, course enrollment, grading |
+
+Định hướng domain production:
+
+- `www.e16...`: landing/public marketing, ưu tiên static hoặc Next.js/Vercel, cache/CDN mạnh, SEO tốt, không phụ thuộc Flask session/auth.
+- `app.e16...`: LMS login và nghiệp vụ, gồm dashboard, role, quiz, assignment, gradebook, certificate, Admin/Học vụ/Lễ tân/Kế toán.
+- Flask tiếp tục là backend chính cho nghiệp vụ LMS; chưa cần rewrite sang Next.js nếu mục tiêu trước mắt là ổn định production.
 
 ### 7.2. Domain model chính
 
@@ -121,25 +147,30 @@ Student cần tìm khóa học, đăng ký học, xem bài học theo thứ tự
 
 ## 8. Quy trình nghiệp vụ cốt lõi
 
-### 8.1. Đăng ký và đăng nhập
+### 8.1. Cấp tài khoản và đăng nhập
 
-1. Người dùng đăng ký bằng email/password, chọn Student hoặc Teacher.
-2. Hệ thống kiểm tra email duy nhất, mật khẩu tối thiểu 8 ký tự và xác nhận mật khẩu.
-3. Người dùng đăng nhập bằng email/password hoặc Google OAuth.
-4. Hệ thống chặn tài khoản inactive.
-5. Sau đăng nhập, hệ thống điều hướng theo role:
+1. Người dùng không tự đăng ký tài khoản trên production; tài khoản được cấp bởi Admin hoặc Lễ tân theo quy trình vận hành.
+2. Admin có thể tạo tài khoản cho mọi role hợp lệ; Lễ tân chỉ tạo tài khoản Student.
+3. Tài khoản mới nhận mật khẩu tạm, bị đánh dấu `must_change_password=True` và phải đổi mật khẩu khi đăng nhập lần đầu.
+4. Người dùng đăng nhập bằng email/password hoặc Google OAuth; OAuth chỉ cho phép login với email đã được cấp tài khoản trước đó.
+5. Hệ thống chặn tài khoản inactive.
+6. Sau đăng nhập, hệ thống điều hướng theo role:
    - Student: `/dashboard`
    - Teacher: `/teacher/dashboard`
+   - Học vụ: `/hoc-vu/dashboard`
+   - Lễ tân: `/le-tan/dashboard`
+   - Kế toán: `/ke-toan/dashboard`
    - Admin: `/analytics/`
 
 ### 8.2. Quản trị người dùng
 
 1. Admin xem danh sách người dùng.
-2. Admin đổi role giữa Student, Teacher, Admin.
-3. Admin khóa/mở tài khoản.
-4. Admin xóa người dùng nếu không phải chính mình.
-5. Admin import CSV người dùng với email và role.
-6. Hệ thống ghi audit log cho thao tác quan trọng.
+2. Admin tạo tài khoản đơn lẻ cho role hợp lệ, cấp mật khẩu tạm và có thể auto-enroll nếu tạo Student kèm course.
+3. Admin đổi role giữa `student`, `teacher`, `admin`, `hoc_vu`, `le_tan`, `ke_toan`.
+4. Admin khóa/mở tài khoản.
+5. Admin xóa người dùng theo nghĩa soft delete/deactivate nếu không phải chính mình.
+6. Admin import CSV người dùng với email và role.
+7. Hệ thống ghi audit log cho thao tác quan trọng.
 
 ### 8.3. Vòng đời khóa học
 
@@ -147,8 +178,8 @@ Student cần tìm khóa học, đăng ký học, xem bài học theo thứ tự
 2. Teacher cập nhật metadata: title, short description, description, cover image, category.
 3. Teacher thêm ít nhất một lesson.
 4. Teacher gửi duyệt, hệ thống chuyển trạng thái sang `pending_review`.
-5. Admin duyệt khóa học, hệ thống chuyển sang `published`.
-6. Admin từ chối khóa học, hệ thống chuyển sang `rejected` và lưu lý do.
+5. Admin hoặc Học vụ duyệt khóa học, hệ thống chuyển sang `published`.
+6. Admin hoặc Học vụ từ chối khóa học, hệ thống chuyển sang `rejected` và lưu lý do.
 7. Student chỉ nhìn thấy khóa học `published`.
 
 ### 8.4. Học tập và tiến độ
@@ -207,18 +238,26 @@ Student cần tìm khóa học, đăng ký học, xem bài học theo thứ tự
 5. Nếu certificate bị thu hồi hoặc course/user bị soft delete theo chính sách, URL public phải hiển thị trạng thái không còn hiệu lực thay vì trả dữ liệu cũ.
 6. Trang public không được hiển thị điểm số, transcript, email đầy đủ, phone, submission hoặc learning logs.
 
+### 8.10. Ghi danh và thanh toán
+
+1. Student chọn khóa học published và đi qua trang checkout để tạo enrollment `pending_payment`.
+2. Nếu `PAYMENT_MODE=mock`, luồng simulate IPN chỉ dùng cho development/staging và không được xem là thanh toán production.
+3. Nếu `PAYMENT_MODE=real`, hệ thống phải tích hợp provider/webhook thật hoặc quy trình đối soát thủ công rõ ràng trước khi cấp quyền học.
+4. Kế toán duyệt giao dịch `pending_payment` sau đối soát; enrollment chỉ chuyển sang quyền học active khi thanh toán được approve.
+5. Kế toán có thể reject/refund nhưng phải giữ lịch sử tài chính, audit log và không xóa dữ liệu học tập ngoài chính sách retention.
+
 ## 9. Yêu cầu chức năng
 
 ### 9.1. Authentication & Authorization
 
 | ID | Yêu cầu | Ưu tiên | Tiêu chí nghiệm thu |
 | --- | --- | --- | --- |
-| AUTH-001 | Người dùng đăng ký tài khoản bằng email/password | Must | Email không trùng, mật khẩu tối thiểu 8 ký tự, confirm password khớp |
+| AUTH-001 | Tài khoản người dùng được cấp bởi Admin hoặc Lễ tân | Must | Không có self-registration production; email không trùng; tài khoản mới có mật khẩu tạm và `must_change_password=True` |
 | AUTH-002 | Người dùng đăng nhập bằng email/password | Must | Đúng credential thì login, sai thì báo lỗi chung |
 | AUTH-003 | Hệ thống chặn tài khoản inactive | Must | User inactive không thể login |
 | AUTH-004 | Hệ thống hỗ trợ reset password qua email | Must | Token có hạn 1 giờ, dùng xong bị xóa |
-| AUTH-005 | Hệ thống hỗ trợ Google OAuth | Should | User mới từ OAuth được tạo với role Student |
-| AUTH-006 | Route phải được bảo vệ theo role | Must | Student không vào trang Teacher/Admin; Teacher không vào Admin |
+| AUTH-005 | Hệ thống hỗ trợ Google OAuth login-only | Should | Email đã được cấp tài khoản có thể đăng nhập OAuth; email chưa được cấp bị từ chối bằng thông báo chung/liên hệ Học vụ |
+| AUTH-006 | Route phải được bảo vệ theo role | Must | Student, Teacher, Học vụ, Lễ tân, Kế toán và Admin chỉ truy cập được vùng chức năng đúng quyền |
 | AUTH-007 | Admin không thể tự xóa/tự đổi role/tự deactivate chính mình | Must | Các hành động này bị chặn |
 
 ### 9.2. Admin
@@ -226,7 +265,7 @@ Student cần tìm khóa học, đăng ký học, xem bài học theo thứ tự
 | ID | Yêu cầu | Ưu tiên | Tiêu chí nghiệm thu |
 | --- | --- | --- | --- |
 | ADM-001 | Admin xem danh sách users | Must | Danh sách sắp xếp mới nhất trước |
-| ADM-002 | Admin đổi role user | Must | Chỉ nhận role student/teacher/admin |
+| ADM-002 | Admin đổi role user | Must | Chỉ nhận role hợp lệ: `student`, `teacher`, `admin`, `hoc_vu`, `le_tan`, `ke_toan`; Admin không tự đổi role chính mình |
 | ADM-003 | Admin khóa/mở tài khoản | Must | is_active thay đổi và audit log được ghi |
 | ADM-004 | Admin import users bằng CSV | Must | CSV tuân thủ format ở mục 10.5; trả kết quả thành công/lỗi từng dòng; không tạo dữ liệu lỗi một phần ngoài chính sách batch |
 | ADM-005 | Admin quản lý category | Must | Tạo/sửa/xóa category; không xóa category đang có course |
@@ -234,8 +273,37 @@ Student cần tìm khóa học, đăng ký học, xem bài học theo thứ tự
 | ADM-007 | Admin xem audit log | Must | Hiển thị 200 log mới nhất kèm actor nếu có |
 | ADM-008 | Admin duyệt/từ chối course | Must | Course chuyển đúng trạng thái và Teacher nhận notification |
 | ADM-009 | Admin chạy seed chỉ trong development | Must | Production trả 403 |
+| ADM-010 | Admin tạo tài khoản đơn lẻ | Must | Tạo user với email/role/phone, mật khẩu tạm, `must_change_password=True`; nếu role Student và có course thì có thể auto-enroll |
 
-### 9.3. Teacher
+### 9.3. Học vụ
+
+| ID | Yêu cầu | Ưu tiên | Tiêu chí nghiệm thu |
+| --- | --- | --- | --- |
+| HOC-001 | Học vụ xem dashboard riêng | Must | Hiển thị số khóa học chờ duyệt và liên kết đến hàng đợi review |
+| HOC-002 | Học vụ xem danh sách course pending_review | Must | Chỉ hiển thị course cần duyệt, có thông tin teacher/category/lesson |
+| HOC-003 | Học vụ duyệt hoặc từ chối course | Must | Course chuyển sang `published` hoặc `rejected`; lý do từ chối được lưu; Teacher nhận notification |
+
+### 9.4. Lễ tân
+
+| ID | Yêu cầu | Ưu tiên | Tiêu chí nghiệm thu |
+| --- | --- | --- | --- |
+| LET-001 | Lễ tân xem dashboard riêng | Must | Hiển thị số học viên, enrollment gần đây và hành động nhanh |
+| LET-002 | Lễ tân tra cứu danh sách học viên | Must | Tìm theo email/điện thoại/trạng thái; chỉ hiển thị user role Student |
+| LET-003 | Lễ tân xem và cập nhật hồ sơ học viên | Must | Cập nhật phone/is_active trong phạm vi được phép; không đổi role hoặc quyền hệ thống |
+| LET-004 | Lễ tân tạo tài khoản Student | Must | Tạo email Student duy nhất, mật khẩu tạm, `must_change_password=True` |
+| LET-005 | Lễ tân ghi danh trực tiếp tại quầy | Must | Tạo enrollment cho Student vào course published, ghi trạng thái thanh toán theo quy trình frontdesk |
+
+### 9.5. Kế toán
+
+| ID | Yêu cầu | Ưu tiên | Tiêu chí nghiệm thu |
+| --- | --- | --- | --- |
+| KTO-001 | Kế toán xem dashboard doanh thu | Must | Hiển thị paid/pending/refunded và tổng doanh thu theo dữ liệu enrollment |
+| KTO-002 | Kế toán xem hàng đợi đối soát | Must | Danh sách enrollment `pending_payment` có thông tin student/course/amount/source |
+| KTO-003 | Kế toán duyệt hoặc từ chối thanh toán | Must | Approve chuyển enrollment sang paid/active; reject giữ lịch sử và không cấp quyền học sai trạng thái |
+| KTO-004 | Kế toán xử lý hoàn phí | Must | Refund cập nhật trạng thái tài chính, giữ audit và không xóa dữ liệu học tập ngoài chính sách |
+| KTO-005 | Kế toán xuất CSV doanh thu | Must | CSV tải được, có mã enrollment, student, course, amount, status, timestamps |
+
+### 9.6. Teacher
 
 | ID | Yêu cầu | Ưu tiên | Tiêu chí nghiệm thu |
 | --- | --- | --- | --- |
@@ -252,7 +320,7 @@ Student cần tìm khóa học, đăng ký học, xem bài học theo thứ tự
 | TCH-011 | Teacher xem/export gradebook | Must | CSV chứa student và điểm quiz/assignment |
 | TCH-012 | Teacher xem course analytics | Should | Có funnel lesson, quiz avg, score distribution |
 
-### 9.4. Student
+### 9.7. Student
 
 | ID | Yêu cầu | Ưu tiên | Tiêu chí nghiệm thu |
 | --- | --- | --- | --- |
@@ -268,7 +336,7 @@ Student cần tìm khóa học, đăng ký học, xem bài học theo thứ tự
 | STU-010 | Student nhận certificate khi hoàn thành | Must | Certificate có cert_code public, trang xác thực chỉ hiển thị dữ liệu tối thiểu theo chính sách privacy ở mục 8.9 |
 | STU-011 | Student xem notifications | Must | Có thể mark read từng notification hoặc tất cả |
 
-### 9.5. Communication
+### 9.8. Communication
 
 | ID | Yêu cầu | Ưu tiên | Tiêu chí nghiệm thu |
 | --- | --- | --- | --- |
@@ -280,7 +348,7 @@ Student cần tìm khóa học, đăng ký học, xem bài học theo thứ tự
 | COM-006 | Teacher/Admin kiểm duyệt forum | Must | Teacher owner và Admin có thể ẩn/xóa thread/reply vi phạm; hành động được ghi audit log |
 | COM-007 | Người dùng report nội dung forum | Should | Report tạo queue kiểm duyệt cho Teacher/Admin và không hiển thị thông tin reporter cho học viên khác |
 
-### 9.6. Analytics & Export
+### 9.9. Analytics & Export
 
 | ID | Yêu cầu | Ưu tiên | Tiêu chí nghiệm thu |
 | --- | --- | --- | --- |
@@ -297,7 +365,7 @@ Student cần tìm khóa học, đăng ký học, xem bài học theo thứ tự
 ### 10.1. Quy tắc dữ liệu
 
 - Email người dùng phải duy nhất, lowercase khi nhập từ form.
-- Role hợp lệ: `student`, `teacher`, `admin`.
+- Role hợp lệ: `student`, `teacher`, `admin`, `hoc_vu`, `le_tan`, `ke_toan`.
 - User có `is_active=False` không được đăng nhập.
 - Course status hợp lệ: `draft`, `pending_review`, `published`, `rejected`.
 - Student chỉ enroll được course `published`.
@@ -343,8 +411,8 @@ Student cần tìm khóa học, đăng ký học, xem bài học theo thứ tự
 | Delimiter | Comma `,`; phase sau có thể hỗ trợ semicolon bằng auto-detect |
 | Header row | Bắt buộc |
 | Required columns | `email`, `role` |
-| Optional columns | `phone`, `is_active`; phase sau có thể thêm `display_name` nếu model hỗ trợ |
-| Role values | `student`, `teacher`, `admin`; giá trị khác bị reject từng dòng |
+| Optional columns | `phone`, `is_active`, `course_id`; phase sau có thể thêm `display_name` nếu model hỗ trợ |
+| Role values | `student`, `teacher`, `admin`, `hoc_vu`, `le_tan`, `ke_toan`; giá trị khác bị reject từng dòng |
 | Email handling | Trim, lowercase, validate có `@`; email trùng mặc định bị skip và ghi kết quả "exists" |
 | Update existing | Không update user đã tồn tại trong bản production đầu tiên, trừ khi có option explicit `update_existing=true` ở phase sau |
 | Max file size | Theo `MAX_CONTENT_LENGTH`; khuyến nghị giới hạn CSV import riêng tối đa 5 MB |
@@ -564,7 +632,7 @@ Student cần tìm khóa học, đăng ký học, xem bài học theo thứ tự
 
 - Multi-tenant/basic organization.
 - SCORM/xAPI hoặc LTI.
-- Payment/course marketplace nếu cần thương mại hóa.
+- Payment provider nâng cao hoặc course marketplace nếu cần thương mại hóa.
 - Advanced reporting.
 - Mobile responsive polish hoặc PWA.
 
@@ -591,6 +659,9 @@ Student cần tìm khóa học, đăng ký học, xem bài học theo thứ tự
 | `APP_ENV=production` | Có | Chọn production config |
 | `SECRET_KEY` | Có | Secret mạnh, không commit |
 | `DATABASE_URL` | Có | PostgreSQL URL |
+| `APP_BASE_URL` | Có | Domain app LMS dùng cho OAuth redirect, reset password và link hệ thống |
+| `PUBLIC_SITE_URL` | Khuyến nghị | Domain landing/public marketing, ví dụ `www.e16...` |
+| `PAYMENT_MODE` | Có | `mock` chỉ dùng dev/staging; production dùng provider thật hoặc quy trình đối soát thủ công có audit |
 | `RATELIMIT_STORAGE_URI` | Có | Redis URL |
 | `SESSION_COOKIE_SECURE=True` | Có | Khi chạy HTTPS |
 | `MAIL_SERVER` | Có nếu bật email | SMTP |
@@ -619,8 +690,8 @@ Student cần tìm khóa học, đăng ký học, xem bài học theo thứ tự
 
 ### 18.2. Integration tests
 
-- Auth registration/login/logout/reset password.
-- Role access matrix cho Admin/Teacher/Student.
+- Auth login/logout/reset password, cấp tài khoản và OAuth login-only.
+- Role access matrix cho Admin, Học vụ, Lễ tân, Kế toán, Teacher và Student.
 - Course lifecycle draft -> pending_review -> published/rejected.
 - Student enroll -> learn -> complete -> certificate.
 - Assignment submit -> grade -> notification.
@@ -673,14 +744,14 @@ E16 LMS được xem là sẵn sàng production khi:
 - Monitoring/alerting hoạt động.
 - Email reset password đạt SLA P95 60 giây trong staging test hoặc provider sandbox test.
 - Load test phase 1 đạt baseline ở mục 11.2.
-- Admin/Teacher/Student UAT pass.
+- Admin, Học vụ, Lễ tân, Kế toán, Teacher và Student UAT pass.
 - Tài liệu vận hành và biến môi trường production đầy đủ.
 
 ## 21. Phụ lục - Route inventory nghiệp vụ
 
 ### Auth
 
-- `/auth/register`
+- `/auth/register` (development/staging hoặc luồng nội bộ; production public không dùng self-registration)
 - `/auth/login`
 - `/auth/logout`
 - `/auth/forgot-password`
@@ -692,14 +763,19 @@ E16 LMS được xem là sẵn sàng production khi:
 
 - `/courses`
 - `/dashboard`
+- `/checkout/<course_id>`
+- `/checkout/simulate-ipn/<course_id>` (development/staging only khi `PAYMENT_MODE=mock`)
+- `/checkout/cancel/<course_id>`
 - `/enroll/<course_id>`
 - `/learn/<course_id>`
 - `/learn/<course_id>/complete/<lesson_id>`
 - `/learn/<course_id>/quiz/<quiz_id>`
+- `/learn/<course_id>/quiz/<quiz_id>/review/<attempt_id>`
 - `/learn/<course_id>/assignment/<assignment_id>`
 - `/transcript`
 - `/calendar`
 - `/certificates`
+- `/submissions/<submission_id>/download`
 - `/certificates/<cert_code>`
 
 ### Teacher
@@ -734,6 +810,7 @@ E16 LMS được xem là sẵn sàng production khi:
 Ghi chú production: `/admin/seed` chỉ được phép tồn tại ở development/staging. Trong production, route này phải bị xóa khỏi route table hoặc luôn trả 404/403 trước khi thực hiện bất kỳ logic seed nào.
 
 - `/admin/users`
+- `/admin/users/create`
 - `/admin/users/<user_id>/update_role`
 - `/admin/users/<user_id>/delete`
 - `/admin/users/<user_id>/toggle_status`
@@ -749,6 +826,31 @@ Ghi chú production: `/admin/seed` chỉ được phép tồn tại ở developm
 - `/admin/courses/<course_id>/approve`
 - `/admin/courses/<course_id>/reject`
 - `/admin/seed` (development/staging only; forbidden in production)
+
+### Học vụ
+
+- `/hoc-vu/dashboard`
+- `/hoc-vu/courses/pending`
+- `/hoc-vu/courses/<course_id>/review`
+
+### Lễ tân
+
+- `/le-tan/dashboard`
+- `/le-tan/students`
+- `/le-tan/students/<user_id>`
+- `/le-tan/students/<user_id>/reset-password`
+- `/le-tan/students/create`
+- `/le-tan/enroll`
+
+### Kế toán
+
+- `/ke-toan/dashboard`
+- `/ke-toan/reconciliation`
+- `/ke-toan/reconciliation/approve/<enroll_id>`
+- `/ke-toan/reconciliation/reject/<enroll_id>`
+- `/ke-toan/revenue`
+- `/ke-toan/refund/<enroll_id>`
+- `/ke-toan/export-revenue`
 
 ### Communication
 
