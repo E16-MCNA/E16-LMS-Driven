@@ -77,6 +77,13 @@ def create_app():
                 ("courses", "ends_at", f"{timestamp_type} DEFAULT NULL"),
                 ("courses", "enrollment_deadline", f"{timestamp_type} DEFAULT NULL"),
                 ("courses", "max_students", "INTEGER DEFAULT NULL"),
+                ("enrollments", "amount_paid", "INTEGER DEFAULT NULL"),
+                ("enrollments", "payment_method", "VARCHAR(50) DEFAULT NULL"),
+                ("enrollments", "tx_code", "VARCHAR(100) DEFAULT NULL"),
+                ("enrollments", "approved_by", "VARCHAR(36) DEFAULT NULL"),
+                ("enrollments", "approved_at", f"{timestamp_type} DEFAULT NULL"),
+                ("enrollments", "rejected_reason", "TEXT DEFAULT NULL"),
+                ("enrollments", "refunded_at", f"{timestamp_type} DEFAULT NULL"),
             ]
             for tbl, col, ddl in _self_heal_cols:
                 ensure_column(tbl, col, ddl)
