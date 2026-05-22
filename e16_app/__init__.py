@@ -302,9 +302,12 @@ def create_app():
     @app.context_processor
     def inject_global_data():
         from .services.settings import get_setting
+        from .urls import app_origin, public_origin
         data = {
             "site_name": get_setting("site_name", "E16 LMS"),
             "site_logo": get_setting("site_logo_url", ""),
+            "app_base_url": app_origin(),
+            "public_site_url": public_origin(),
             "unread_notifs_count": 0
         }
         try:

@@ -14,6 +14,7 @@ from ..extensions import db
 from ..models import User, Course, Enrollment, LearningLog, Lesson, Certificate
 from ..services.audit import log_action
 from ..time_utils import utcnow
+from ..urls import app_url_for
 
 bp = Blueprint("le_tan", __name__, url_prefix="/le-tan")
 
@@ -36,7 +37,7 @@ def _send_welcome_email(email: str, temp_password: str, role: str):
                 email=email,
                 temp_password=temp_password,
                 role=role,
-                login_url=url_for("auth.login", _external=True),
+                login_url=app_url_for("auth.login"),
                 site_name=current_app.config.get("SITE_NAME", "E16 LMS"),
             )
         else:

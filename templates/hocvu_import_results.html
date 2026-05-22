@@ -3,7 +3,7 @@
 <header class="top-header">
   <div>
     <h1>Kết quả Import</h1>
-    <p>Dưới đây là danh sách tài khoản đã được xử lý. <strong>Vui lòng lưu lại mật khẩu tạm thời!</strong></p>
+    <p>Dưới đây là danh sách tài khoản đã được xử lý. <strong>Vui lòng lưu lại mật khẩu tạm thời.</strong></p>
   </div>
   <div class="actions">
     <a href="{{ url_for('hoc_vu.dashboard') }}" class="btn btn-outline">Quay lại Dashboard</a>
@@ -26,13 +26,13 @@
         <tr style="border-bottom: 1px solid var(--card-border);">
           <td style="padding: 16px; font-weight: 600;">{{ res.email }}</td>
           <td style="padding: 16px;">
-            <span class="badge" style="background: rgba(59, 130, 246, 0.1); color: var(--primary);">{{ res.role or '—' }}</span>
+            <span class="badge" style="background: rgba(59, 130, 246, 0.1); color: var(--primary);">{{ res.role or 'Không có' }}</span>
           </td>
           <td style="padding: 16px;">
             {% if res.temp_pass %}
               <code style="background: rgba(59, 130, 246, 0.1); padding: 4px 8px; border-radius: 4px; font-weight: 700;">{{ res.temp_pass }}</code>
             {% else %}
-              —
+              Không có
             {% endif %}
           </td>
           <td style="padding: 16px;">
