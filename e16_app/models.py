@@ -152,9 +152,18 @@ class Enrollment(db.Model):
     enrolled_at = db.Column(db.DateTime, default=_utcnow, nullable=False, index=True)
     status = db.Column(db.String(20), default="active", nullable=False, index=True)  # active, dropped, completed
 
+    # Ledger fields for payment accounting
+    amount_paid = db.Column(db.Integer, nullable=True)
+    payment_method = db.Column(db.String(50), nullable=True)
+    tx_code = db.Column(db.String(100), nullable=True)
+    approved_by = db.Column(db.String(36), db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    approved_at = db.Column(db.DateTime, nullable=True)
+    rejected_reason = db.Column(db.Text, nullable=True)
+    refunded_at = db.Column(db.DateTime, nullable=True)
+
     # ORM relationships for joinedload
     course = db.relationship("Course", lazy="select")
-    user = db.relationship("User", lazy="select")
+    user = db.relationship("User", lazy="select", foreign_keys=[user_id])
 
 
 class LearningLog(db.Model):
