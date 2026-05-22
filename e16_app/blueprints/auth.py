@@ -11,6 +11,7 @@ from ..extensions import db, oauth, limiter
 from ..models import Course, Enrollment, LearningLog, Lesson, User
 from ..services.course import recalc_total_lessons
 from ..services.logging import logger
+from ..urls import app_url_for
 
 bp = Blueprint("auth", __name__)
 
@@ -24,7 +25,7 @@ def oauth_login(name):
     client = oauth.create_client(name)
     if not client:
         return redirect(url_for("auth.login"))
-    redirect_uri = url_for("auth.oauth_authorize", name=name, _external=True)
+    redirect_uri = app_url_for("auth.oauth_authorize", name=name)
     return client.authorize_redirect(redirect_uri)
 
 
@@ -188,7 +189,7 @@ def forgot_password():
             user.reset_token = token
             user.reset_token_expiry = _utcnow() + timedelta(hours=1)
             db.session.commit()
-            reset_url = url_for("auth.reset_password", token=token, _external=True)
+            reset_url = app_url_for("auth.reset_password", token=token)
             # Gửi email thật nếu SMTP đã cấu hình
             _send_reset_email(email, reset_url)
         # Security: luôn trả về thông báo chung để chống email enumeration

@@ -78,6 +78,25 @@ Docker Compose chạy:
 - `db`: PostgreSQL 15.
 - `redis`: rate-limit storage.
 
+## Domain production
+
+Khuyến nghị tách public site và LMS app thành hai domain/subdomain:
+
+| Domain | Vai trò | Ghi chú |
+| --- | --- | --- |
+| `www.e16...` | Landing/public marketing | Static hoặc Next.js trên Vercel, cache CDN mạnh, không dùng Flask session/auth. |
+| `app.e16...` | Flask LMS | Login, dashboard, role, quiz, assignment, gradebook, certificate, admin/học vụ/lễ tân/kế toán. |
+
+Cấu hình env liên quan:
+
+```bash
+APP_BASE_URL=https://app.e16...
+PUBLIC_SITE_URL=https://www.e16...
+PREFERRED_URL_SCHEME=https
+```
+
+`APP_BASE_URL` được dùng cho OAuth callback, reset password và email welcome để tránh sinh link nhầm sang Vercel preview hoặc domain landing.
+
 ## Tài khoản demo
 
 Sau khi seed:

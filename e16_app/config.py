@@ -8,6 +8,10 @@ class Config:
     """Base config."""
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-change-me")
     RUN_BG_DAEMON = os.environ.get("RUN_BG_DAEMON", "False" if os.environ.get("VERCEL") else "True") == "True"
+    SITE_NAME = os.environ.get("SITE_NAME", "E16 LMS")
+    APP_BASE_URL = os.environ.get("APP_BASE_URL") or os.environ.get("APP_URL")
+    PUBLIC_SITE_URL = os.environ.get("PUBLIC_SITE_URL")
+    PREFERRED_URL_SCHEME = os.environ.get("PREFERRED_URL_SCHEME", "https" if os.environ.get("VERCEL") else "http")
     
     # Application Environment
     APP_ENV = os.environ.get("APP_ENV", os.environ.get("FLASK_ENV", "production")).lower()

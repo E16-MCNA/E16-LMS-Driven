@@ -26,6 +26,7 @@ from ..models import (
 from ..pagination import get_pagination, paginate_query
 from ..services.audit import log_action
 from ..time_utils import utcnow
+from ..urls import app_url_for
 
 bp = Blueprint("hoc_vu", __name__, url_prefix="/hoc-vu")
 
@@ -51,7 +52,7 @@ def _send_welcome_email(email: str, temp_password: str, role: str):
                 email=email,
                 temp_password=temp_password,
                 role=role,
-                login_url=url_for("auth.login", _external=True),
+                login_url=app_url_for("auth.login"),
                 site_name=current_app.config.get("SITE_NAME", "E16 LMS"),
             )
         else:
