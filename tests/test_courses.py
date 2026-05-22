@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 import pytest
+from datetime import timedelta
 from sqlalchemy.exc import IntegrityError
 from e16_app import create_app, db
 from e16_app.models import User, Course, Lesson, Enrollment, LearningLog, Quiz, Assignment, Question, Choice, Certificate, Submission
+from e16_app.time_utils import utcnow
 
 @pytest.fixture
 def teacher_user(app):
@@ -55,6 +57,81 @@ def test_student_enrollment(client, app, student_user, teacher_user):
         enrollment = db.session.query(Enrollment).filter_by(user_id=student_user, course_id=course_id).first()
         assert enrollment is not None
         assert enrollment.status == "active"
+
+def test_student_checkout_respects_enrollment_deadline(client, app, student_user, teacher_user):
+    with app.app_context():
+        course = Course(
+            title="Expired Enrollment",
+            teacher_id=teacher_user,
+            status="published",
+            enrollment_deadline=utcnow() - timedelta(days=1),
+        )
+        db.session.add(course)
+        db.session.commit()
+        course_id = course.id
+
+    with client.session_transaction() as sess:
+        sess["_user_id"] = student_user
+        sess["_fresh"] = True
+
+    response = client.get(f"/checkout/{course_id}")
+
+    assert response.status_code == 302
+    with app.app_context():
+        enrollment = db.session.query(Enrollment).filter_by(user_id=student_user, course_id=course_id).first()
+        assert enrollment is None
+
+def test_student_checkout_respects_course_capacity(client, app, student_user, teacher_user):
+    with app.app_context():
+        other_student = User(email="capacity_taken@e16.edu.vn", password_hash="hash", role="student")
+        db.session.add(other_student)
+        db.session.flush()
+        course = Course(title="Full Course", teacher_id=teacher_user, status="published", max_students=1)
+        db.session.add(course)
+        db.session.flush()
+        db.session.add(Enrollment(user_id=other_student.id, course_id=course.id, status="active"))
+        db.session.commit()
+        course_id = course.id
+
+    with client.session_transaction() as sess:
+        sess["_user_id"] = student_user
+        sess["_fresh"] = True
+
+    response = client.get(f"/checkout/{course_id}")
+
+    assert response.status_code == 302
+    with app.app_context():
+        enrollment = db.session.query(Enrollment).filter_by(user_id=student_user, course_id=course_id).first()
+        assert enrollment is None
+
+def test_student_payment_activation_rechecks_capacity(client, app, student_user, teacher_user):
+    with app.app_context():
+        course = Course(title="Race Capacity", teacher_id=teacher_user, status="published", max_students=1)
+        db.session.add(course)
+        db.session.commit()
+        course_id = course.id
+
+    with client.session_transaction() as sess:
+        sess["_user_id"] = student_user
+        sess["_fresh"] = True
+
+    checkout_response = client.get(f"/checkout/{course_id}")
+    assert checkout_response.status_code == 200
+
+    with app.app_context():
+        other_student = User(email="race_capacity@e16.edu.vn", password_hash="hash", role="student")
+        db.session.add(other_student)
+        db.session.flush()
+        db.session.add(Enrollment(user_id=other_student.id, course_id=course_id, status="active"))
+        db.session.commit()
+
+    response = client.post(f"/enroll/{course_id}")
+
+    assert response.status_code == 302
+    with app.app_context():
+        enrollment = db.session.query(Enrollment).filter_by(user_id=student_user, course_id=course_id).first()
+        assert enrollment is not None
+        assert enrollment.status == "pending_payment"
 
 def test_student_cannot_access_unenrolled_quiz_or_assignment(client, app, student_user, teacher_user):
     with app.app_context():
