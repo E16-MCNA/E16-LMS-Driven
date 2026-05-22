@@ -1,4 +1,4 @@
-﻿CREATE TABLE background_jobs (
+CREATE TABLE background_jobs (
 	id VARCHAR(36) NOT NULL,
 	task_name VARCHAR(100) NOT NULL,
 	payload TEXT NOT NULL,
@@ -312,3 +312,30 @@ CREATE TABLE quiz_answers (
 	CONSTRAINT fk_quiz_answers_question_id_questions FOREIGN KEY(question_id) REFERENCES questions (id) ON DELETE CASCADE,
 	CONSTRAINT fk_quiz_answers_choice_id_choices FOREIGN KEY(choice_id) REFERENCES choices (id) ON DELETE CASCADE
 );
+
+CREATE TABLE payment_transactions (
+	id VARCHAR(36) NOT NULL,
+	enrollment_id VARCHAR(36) NOT NULL,
+	user_id VARCHAR(36) NOT NULL,
+	course_id VARCHAR(36) NOT NULL,
+	amount INTEGER NOT NULL,
+	payment_method VARCHAR(50) NOT NULL,
+	tx_code VARCHAR(100),
+	status VARCHAR(20) NOT NULL,
+	processed_by VARCHAR(36),
+	processed_at TIMESTAMP WITHOUT TIME ZONE,
+	notes TEXT,
+	created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+	CONSTRAINT pk_payment_transactions PRIMARY KEY (id),
+	CONSTRAINT fk_payment_transactions_enrollment_id_enrollments FOREIGN KEY(enrollment_id) REFERENCES enrollments (id) ON DELETE CASCADE,
+	CONSTRAINT fk_payment_transactions_user_id_users FOREIGN KEY(user_id) REFERENCES users (id),
+	CONSTRAINT fk_payment_transactions_course_id_courses FOREIGN KEY(course_id) REFERENCES courses (id),
+	CONSTRAINT fk_payment_transactions_processed_by_users FOREIGN KEY(processed_by) REFERENCES users (id)
+);
+
+CREATE INDEX idx_payment_transactions_enrollment_id ON payment_transactions (enrollment_id);
+CREATE INDEX idx_payment_transactions_user_id ON payment_transactions (user_id);
+CREATE INDEX idx_payment_transactions_course_id ON payment_transactions (course_id);
+CREATE INDEX idx_payment_transactions_status ON payment_transactions (status);
+CREATE INDEX idx_payment_transactions_processed_by ON payment_transactions (processed_by);
+CREATE INDEX idx_payment_transactions_tx_code ON payment_transactions (tx_code);

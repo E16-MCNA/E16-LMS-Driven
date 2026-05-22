@@ -40,12 +40,20 @@
         </tr>
         <tr>
           <td style="padding: 8px;"><code>role</code></td>
-          <td style="padding: 8px;">student, teacher, hoặc admin.</td>
+          <td style="padding: 8px;">Bắt buộc. Một trong 6 vai trò: <code>student</code>, <code>teacher</code>, <code>hoc_vu</code>, <code>le_tan</code>, <code>ke_toan</code>, <code>admin</code>.</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px;"><code>phone</code></td>
+          <td style="padding: 8px;">Số điện thoại (tùy chọn).</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px;"><code>course_id</code></td>
+          <td style="padding: 8px;">ID khóa học tự động ghi danh (tùy chọn, chỉ dành cho học viên).</td>
         </tr>
       </tbody>
     </table>
     <div style="margin-top: 24px;">
-      <button class="btn btn-outline btn-sm" onclick="alert('Tính năng tải template đang được phát triển!')">Tải file mẫu .csv</button>
+      <a href="data:text/csv;charset=utf-8,email,role,phone,course_id%0Astudent_sample%40e16.edu.vn,student,0912345678,%0Ateacher_sample%40e16.edu.vn,teacher,0987654321," download="e16_import_template.csv" class="btn btn-outline btn-sm">📄 Tải file mẫu .csv</a>
     </div>
   </section>
 </div>

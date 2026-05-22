@@ -19,7 +19,7 @@ from e16_app.models import (
 def seeded_db(app):
     with app.app_context():
         now = datetime.now(timezone.utc)
-        
+
         # 1. USERS — password is 'TestPass123!'
         pwd_hash = generate_password_hash("TestPass123!")
         users = [
@@ -160,7 +160,7 @@ def seeded_db(app):
         ]
         db.session.add_all(logs)
         db.session.commit()
-        
+
         # 9. CERTIFICATES
         cert = Certificate(id='cert-done-py', user_id='u-sd', course_id='c-py', cert_code='cert-code-sd-py', issued_at=now - timedelta(days=48))
         db.session.add(cert)
@@ -235,12 +235,27 @@ def test_scenario_7_certificate_issued_only_at_100_percent(client, app, seeded_d
         cert = db.session.query(Certificate).filter_by(user_id="u-s1", course_id="c-py").first()
         assert cert is None
 
-def test_scenario_8_certificate_of_soft_deleted_course_remains_valid(client, seeded_db):
-    """Scenario 8: Certificate of a soft-deleted course remains publicly valid."""
-    # c-del is soft-deleted (is_deleted=True, status='archived')
-    # Let's link certificate to c-del instead
+def test_scenario_8_certificate_of_soft_deleted_course_remains_valid(client, seeded_db, app):
+    """Scenario 8: Certificate of a soft-deleted course is revoked and public view returns 404."""
+    with app.app_context():
+        # Update the certificate's course_id to c-del (which is soft-deleted)
+        cert = db.session.query(Certificate).filter_by(cert_code="cert-code-sd-py").first()
+        cert.course_id = "c-del"
+        db.session.commit()
     response = client.get("/certificates/cert-code-sd-py")
-    assert response.status_code == 200  # Returns 200 with masked name!
+    assert response.status_code == 404
+
+def test_certificate_of_inactive_student_is_revoked(client, seeded_db, app):
+    """Verify that certificate of an inactive student is revoked and public view returns 404."""
+    with app.app_context():
+        # Reset course back to c-py but make student inactive
+        cert = db.session.query(Certificate).filter_by(cert_code="cert-code-sd-py").first()
+        cert.course_id = "c-py"
+        student = db.session.get(User, "u-sd")
+        student.is_active = False
+        db.session.commit()
+    response = client.get("/certificates/cert-code-sd-py")
+    assert response.status_code == 404
 
 def test_scenario_9_admin_approves_pending_course(client, app, seeded_db):
     """Scenario 9: Admin approves pending course to publish it."""
@@ -251,7 +266,7 @@ def test_scenario_9_admin_approves_pending_course(client, app, seeded_db):
     assert response.status_code == 302
     with app.app_context():
         c = db.session.get(Course, "c-pend")
-        assert c.status == "approved"
+        assert c.status == "published"
 
 def test_scenario_10_teacher_export_gradebook(client, seeded_db):
     """Scenario 10: Teacher can export course gradebook without errors."""
@@ -287,11 +302,11 @@ def test_edge_1_score_boundaries(app, seeded_db):
         sub = Submission(id="sub-edge1", assignment_id="a-py-edge1", user_id="u-s1", status="pending")
         db.session.add_all([assign, sub])
         db.session.commit()
-        
+
         # Underflow clamps to 0
         GradingService.grade_assignment_submission("sub-edge1", -15, "feedback", "u-ta")
         assert db.session.get(Submission, "sub-edge1").score == 0
-        
+
         # Overflow clamps to 100
         GradingService.grade_assignment_submission("sub-edge1", 120, "feedback", "u-ta")
         assert db.session.get(Submission, "sub-edge1").score == 100
@@ -308,10 +323,10 @@ def test_edge_2_past_vs_future_assignment_deadline(client, app, seeded_db):
     with client.session_transaction() as sess:
         sess["_user_id"] = "u-s1"
         sess["_fresh"] = True
-        
+
     res_past = client.post("/learn/c-py/assignment/a-past", data={"text_content": "Late submission"})
     assert res_past.status_code == 302
-    
+
     res_future = client.post("/learn/c-py/assignment/a-future", data={"text_content": "Valid submission"})
     assert res_future.status_code == 302
 
@@ -321,7 +336,7 @@ def test_edge_3_user_last_login_null(client, app, seeded_db):
         u = db.session.get(User, "u-s5")
         u.last_login = None
         db.session.commit()
-        
+
     with client.session_transaction() as sess:
         sess["_user_id"] = "u-admin"
         sess["_fresh"] = True
@@ -349,7 +364,7 @@ def test_edge_6_csv_import_duplicate_email(client, seeded_db):
     with client.session_transaction() as sess:
         sess["_user_id"] = "u-admin"
         sess["_fresh"] = True
-    
+
     csv_data = "email,role\nnewemail@e16.local,student\nstudent_1@e16.local,student\n"
     response = client.post("/admin/users/import", data={
         "file": (io.BytesIO(csv_data.encode("utf-8")), "import.csv")
@@ -375,11 +390,11 @@ def test_edge_9_password_reset_token_single_use(client, app, seeded_db):
         u.reset_token = "unique-reset-token"
         u.reset_token_expiry = datetime.now(timezone.utc) + timedelta(hours=1)
         db.session.commit()
-        
+
     # Reset password successfully the first time
     res1 = client.post("/auth/reset-password/unique-reset-token", data={"password": "NewSecretPass123!"})
     assert res1.status_code == 302
-    
+
     # Try using the same token again
     res2 = client.post("/auth/reset-password/unique-reset-token", data={"password": "AnotherSecret123!"})
     assert res2.status_code == 302  # Fails and redirects back to login/forgot password with error
@@ -391,7 +406,35 @@ def test_edge_10_soft_delete_user_learning_logs_remain(client, app, seeded_db):
         sess["_fresh"] = True
     response = client.post("/admin/users/u-s1/delete")
     assert response.status_code == 302
-    
+
     with app.app_context():
         logs_count = db.session.query(LearningLog).filter_by(user_id="u-s1").count()
         assert logs_count > 0  # Learning logs remain untouched!
+
+
+def test_quiz_f5_timer_bypass_protection(client, seeded_db):
+    """Verify that hitting refresh (GET /take_quiz) preserves the original quiz start time in the session."""
+    with client.session_transaction() as sess:
+        sess["_user_id"] = "u-s1"  # Student 1
+        sess["_fresh"] = True
+
+    # 1. First GET request initializes start times
+    response = client.get("/learn/c-py/quiz/qz-1")
+    assert response.status_code == 200
+
+    # Read starting timestamps from session
+    with client.session_transaction() as sess:
+        start_time_1 = sess.get("quiz_started_qz-1")
+        started_at_1 = sess.get("quiz_started_at")
+        assert start_time_1 is not None
+        assert started_at_1 is not None
+
+    # 2. Second GET request (refresh/F5) should preserve the original timestamps
+    response = client.get("/learn/c-py/quiz/qz-1")
+    assert response.status_code == 200
+
+    with client.session_transaction() as sess:
+        start_time_2 = sess.get("quiz_started_qz-1")
+        started_at_2 = sess.get("quiz_started_at")
+        assert start_time_2 == start_time_1
+        assert started_at_2 == started_at_1

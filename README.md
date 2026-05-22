@@ -97,18 +97,35 @@ PREFERRED_URL_SCHEME=https
 
 `APP_BASE_URL` được dùng cho OAuth callback, reset password và email welcome để tránh sinh link nhầm sang Vercel preview hoặc domain landing.
 
-## Tài khoản demo
+## Tài khoản demo & Thử nghiệm cục bộ (Local Test)
 
-Sau khi seed:
+Hệ thống phân biệt rõ ràng giữa tài khoản thử nghiệm cục bộ (Local) và tài khoản thực sự trên môi trường Production/Web để tăng cường bảo mật.
 
-| Role | Email | Mật khẩu |
+### 1. Môi trường thử nghiệm cục bộ (Local Development)
+Khi chạy ở môi trường development local, các tài khoản được tự động khởi tạo hoặc seed như sau:
+
+| Vai trò | Email (Local Test) | Mật khẩu (Local Test) |
 | --- | --- | --- |
-| Admin | `admin@e16.local` | `admine16` |
-| Teacher | `teacher@e16.local` | `teachere16` |
-| Student | `student@e16.local` | `studente16` |
-| Student demo | `student1@e16.local` đến `student5@e16.local` | `E16_SEED_PASSWORD` hoặc `demo-password` |
+| Admin | `admin_local@e16.local` | `admin_local_pass` |
+| Teacher | `teacher_local@e16.local` | `teacher_local_pass` |
+| Student | `student_local@e16.local` | `student_local_pass` |
+| Học vụ | `hocvu_local@e16.local` | `hocvu_local_pass` |
+| Học viên demo | `student_local1@e16.local` đến `student_local5@e16.local` | `student_local_pass` |
 
-Không dùng các tài khoản/mật khẩu demo trong production.
+### 2. Môi trường Production / Web thật
+Trên môi trường production thực sự (như Vercel/PostgreSQL), hệ thống đồng bộ các tài khoản bằng khóa bí mật từ biến môi trường `E16_SEED_PASSWORD`:
+
+| Vai trò | Email (Production Web) | Mật khẩu (Production Web) |
+| --- | --- | --- |
+| Admin | `admin@e16.local` | `E16_SEED_PASSWORD` (Được cấu hình trên Vercel) |
+| Teacher | `teacher@e16.local` | `E16_SEED_PASSWORD` (Được cấu hình trên Vercel) |
+| Student | `student@e16.local` | `E16_SEED_PASSWORD` (Được cấu hình trên Vercel) |
+| Học vụ | `hocvu@e16.local` | `E16_SEED_PASSWORD` (Được cấu hình trên Vercel) |
+
+> [!WARNING]
+> Tuyệt đối không sử dụng hoặc chia sẻ các tài khoản thử nghiệm cục bộ (local_pass) trên môi trường production web thực tế.
+
+
 
 ## Kiểm thử
 

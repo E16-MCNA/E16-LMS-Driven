@@ -39,7 +39,7 @@ def dashboard():
     total_students = 0
     total_lessons = 0
     if course_ids:
-        total_students = db.session.query(Enrollment).filter(Enrollment.course_id.in_(course_ids)).count()
+        total_students = db.session.query(Enrollment).filter(Enrollment.course_id.in_(course_ids), Enrollment.status.in_(["active", "completed"])).count()
         total_lessons = db.session.query(Lesson).filter(Lesson.course_id.in_(course_ids)).count()
         
     return render_template("teacher_dashboard.html", 
@@ -148,7 +148,7 @@ def course_students(course_id):
     if not course or course.teacher_id != current_user.id or course.is_deleted:
         return redirect(url_for("teacher.manage_courses"))
         
-    enrollments = db.session.query(Enrollment, User).join(User, User.id == Enrollment.user_id).filter(Enrollment.course_id == course_id).all()
+    enrollments = db.session.query(Enrollment, User).join(User, User.id == Enrollment.user_id).filter(Enrollment.course_id == course_id, Enrollment.status.in_(["active", "completed"])).all()
     
     # Optimized: single GROUP BY query instead of N queries per student
     from ..models import LearningLog, Lesson
@@ -366,7 +366,7 @@ def add_question(quiz_id):
     # Notify students if quiz is published
     if quiz.is_published:
         from ..services.notifications import notify
-        students = db.session.query(Enrollment).filter_by(course_id=quiz.course_id).all()
+        students = db.session.query(Enrollment).filter(Enrollment.course_id == quiz.course_id, Enrollment.status.in_(["active", "completed"])).all()
         for en in students:
             notify(en.user_id, "new_quiz", f"Bài trắc nghiệm mới: {quiz.title}", url_for("student.take_quiz", course_id=quiz.course_id, quiz_id=quiz.id))
 
@@ -411,7 +411,7 @@ def create_assignment(course_id):
 
         # Notify students
         from ..services.notifications import notify
-        students = db.session.query(Enrollment).filter_by(course_id=course_id).all()
+        students = db.session.query(Enrollment).filter(Enrollment.course_id == course_id, Enrollment.status.in_(["active", "completed"])).all()
         for en in students:
             notify(en.user_id, "new_assignment", f"Bài tập mới: {assign.title}", url_for("student.submit_assignment", course_id=course_id, assignment_id=assign.id))
 
@@ -525,7 +525,7 @@ def view_gradebook(course_id):
         return redirect(url_for("teacher.manage_courses"))
         
     max_rows = _export_max_rows()
-    students = db.session.query(User).join(Enrollment, Enrollment.user_id == User.id).filter(Enrollment.course_id == course_id).limit(max_rows).all()
+    students = db.session.query(User).join(Enrollment, Enrollment.user_id == User.id).filter(Enrollment.course_id == course_id, Enrollment.status.in_(["active", "completed"])).limit(max_rows).all()
     quizzes = db.session.query(Quiz).filter_by(course_id=course_id, is_published=True).all()
     assignments = db.session.query(Assignment).filter_by(course_id=course_id).all()
     
@@ -558,7 +558,7 @@ def export_gradebook(course_id):
     if not course or course.teacher_id != current_user.id or course.is_deleted: return redirect(url_for("teacher.manage_courses"))
     
     max_rows = _export_max_rows()
-    students = db.session.query(User).join(Enrollment, Enrollment.user_id == User.id).filter(Enrollment.course_id == course_id).limit(max_rows).all()
+    students = db.session.query(User).join(Enrollment, Enrollment.user_id == User.id).filter(Enrollment.course_id == course_id, Enrollment.status.in_(["active", "completed"])).limit(max_rows).all()
     quizzes = db.session.query(Quiz).filter_by(course_id=course_id, is_published=True).all()
     assignments = db.session.query(Assignment).filter_by(course_id=course_id).all()
     
@@ -612,7 +612,7 @@ def course_analytics(course_id):
         
     from ..models import LearningLog, QuizAttempt
     lessons = db.session.query(Lesson).filter_by(course_id=course_id).order_by(Lesson.sequence_order.asc()).all()
-    enrollment_count = db.session.query(Enrollment).filter_by(course_id=course_id).count()
+    enrollment_count = db.session.query(Enrollment).filter(Enrollment.course_id == course_id, Enrollment.status.in_(["active", "completed"])).count()
     completed_count = db.session.query(Enrollment).filter_by(course_id=course_id, status="completed").count()
     
     # Optimized: Funnel data using GROUP BY

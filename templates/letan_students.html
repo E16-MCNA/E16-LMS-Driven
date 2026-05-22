@@ -40,8 +40,12 @@
       <button type="submit" class="btn btn-primary" style="width: 100%;">Lưu thay đổi</button>
     </form>
     
-    <div style="margin-top: 24px; border-top: 1px solid var(--card-border); padding-top: 20px; text-align: center;">
+    <div style="margin-top: 24px; border-top: 1px solid var(--card-border); padding-top: 20px; text-align: center; display: flex; flex-direction: column; gap: 12px;">
       <a href="{{ url_for('le_tan.enroll_student', email=student.email) }}" class="btn btn-outline" style="width: 100%;">🖊️ Đăng ký khóa học mới</a>
+      <form action="{{ url_for('le_tan.reset_student_password', user_id=student.id) }}" method="POST" style="display: inline; width: 100%;" onsubmit="return confirmAction(this, 'Cấp lại mật khẩu', 'Hành động này sẽ đặt lại mật khẩu của học sinh thành một mật khẩu tạm thời ngẫu nhiên và gửi qua email. Xác nhận?', '🔑');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline" style="width: 100%; color: var(--warning); border-color: rgba(251, 191, 36, 0.3);">🔑 Cấp lại mật khẩu tạm</button>
+      </form>
     </div>
   </div>
 
@@ -86,7 +90,7 @@
           <span style="font-weight: 600; font-size: 0.9rem;">Học phí: <span style="color: var(--primary);">{{ "{:,}".format(e.price) }} VND</span></span>
           
           {% if e.cert_code %}
-            <a href="{{ url_for('student.view_certificate', cert_code=e.cert_code) }}" target="_blank" class="btn btn-outline btn-sm" style="color: var(--success); border-color: rgba(16, 185, 129, 0.3);">🎓 Xem Chứng chỉ</a>
+            <a href="{{ url_for('student.public_certificate', cert_code=e.cert_code) }}" target="_blank" class="btn btn-outline btn-sm" style="color: var(--success); border-color: rgba(16, 185, 129, 0.3);">🎓 Xem Chứng chỉ</a>
           {% endif %}
         </div>
       </div>

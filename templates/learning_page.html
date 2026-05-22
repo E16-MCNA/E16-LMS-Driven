@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
+<div class="learning-tabs">
+  <button type="button" class="tab-btn active" id="tab-btn-content" onclick="switchLearningTab('content')">📖 Bài học & Tài liệu</button>
+  <button type="button" class="tab-btn" id="tab-btn-sidebar" onclick="switchLearningTab('sidebar')">📋 Nội dung khóa học</button>
+</div>
+
 <div class="learning-layout">
   <div class="lesson-content">
     <header class="top-header" style="margin-bottom: 24px;">
@@ -66,7 +71,7 @@
     </div>
   </div>
 
-    <div class="lesson-sidebar">
+    <div class="lesson-sidebar tab-hidden">
       <h2 style="font-size: 1.1rem; margin-bottom: 16px;">Nội dung khóa học</h2>
       
       <div style="margin-bottom: 24px;">
@@ -84,28 +89,22 @@
         {% endfor %}
       </div>
 
-      {% if quizzes %}
-      <div style="margin-bottom: 24px;">
-        <h3 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase;">Trắc nghiệm</h3>
-        {% for q in quizzes %}
-          <a href="{{ url_for('student.take_quiz', course_id=course.id, quiz_id=q.id) }}" class="lesson-link">
-            <div class="lesson-icon" style="background: var(--primary);">?</div>
+      {% if quizzes or assignments %}
+      <div style="margin-top: 24px; margin-bottom: 24px; padding-top: 16px; border-top: 1px solid var(--card-border);">
+        <h3 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase;">Bài tập & Trắc nghiệm</h3>
+        {% for qz in quizzes %}
+          <a href="{{ url_for('student.take_quiz', course_id=course.id, quiz_id=qz.id) }}" class="lesson-link">
+            <div class="lesson-icon" style="background: var(--primary);">📝</div>
             <div style="flex: 1;">
-              <div style="font-size: 0.9rem; font-weight: 500;">{{ q.title }}</div>
+              <div style="font-size: 0.9rem; font-weight: 500;">{{ qz.title }}</div>
             </div>
           </a>
         {% endfor %}
-      </div>
-      {% endif %}
-
-      {% if assignments %}
-      <div style="margin-bottom: 24px;">
-        <h3 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase;">Bài tập</h3>
-        {% for a in assignments %}
-          <a href="{{ url_for('student.submit_assignment', course_id=course.id, assignment_id=a.id) }}" class="lesson-link">
-            <div class="lesson-icon" style="background: var(--secondary);">!</div>
+        {% for asg in assignments %}
+          <a href="{{ url_for('student.submit_assignment', course_id=course.id, assignment_id=asg.id) }}" class="lesson-link">
+            <div class="lesson-icon" style="background: var(--success);">📂</div>
             <div style="flex: 1;">
-              <div style="font-size: 0.9rem; font-weight: 500;">{{ a.title }}</div>
+              <div style="font-size: 0.9rem; font-weight: 500;">{{ asg.title }}</div>
             </div>
           </a>
         {% endfor %}
@@ -173,4 +172,24 @@
   })();
 </script>
 {% endif %}
+
+<script nonce="{{ csp_nonce() }}">
+function switchLearningTab(tab) {
+  const content = document.querySelector('.lesson-content');
+  const sidebar = document.querySelector('.lesson-sidebar');
+  const btnContent = document.getElementById('tab-btn-content');
+  const btnSidebar = document.getElementById('tab-btn-sidebar');
+  if (tab === 'content') {
+    content.classList.remove('tab-hidden');
+    sidebar.classList.add('tab-hidden');
+    btnContent.classList.add('active');
+    btnSidebar.classList.remove('active');
+  } else {
+    content.classList.add('tab-hidden');
+    sidebar.classList.remove('tab-hidden');
+    btnContent.classList.remove('active');
+    btnSidebar.classList.add('active');
+  }
+}
+</script>
 {% endblock %}
