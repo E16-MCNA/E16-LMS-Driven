@@ -271,6 +271,8 @@ def create_app():
     from .blueprints.analytics import bp as analytics_bp
     from .blueprints.communication import bp as communication_bp
     from .blueprints.hoc_vu import bp as hoc_vu_bp
+    from .blueprints.le_tan import bp as le_tan_bp
+    from .blueprints.ke_toan import bp as ke_toan_bp
 
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(student_bp)
@@ -279,6 +281,8 @@ def create_app():
     app.register_blueprint(analytics_bp)
     app.register_blueprint(communication_bp)
     app.register_blueprint(hoc_vu_bp)
+    app.register_blueprint(le_tan_bp)
+    app.register_blueprint(ke_toan_bp)
     
     @app.template_filter("get_choices")
     def get_choices(question_id):

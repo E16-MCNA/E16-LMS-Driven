@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="top-header">
+  <div>
+    <a href="{{ url_for('le_tan.dashboard') }}" style="color: var(--primary); text-decoration: none; font-weight: 600; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px;">🔙 Quay lại Dashboard</a>
+    <h1>Đăng ký học trực tiếp tại Quầy</h1>
+    <p>Áp dụng ghi danh trực tiếp bằng tiền mặt hoặc thanh toán tiền mặt tại quầy đón tiếp.</p>
+  </div>
+</header>
+
+<div style="max-width: 550px; margin: 0 auto;">
+  <div class="card">
+    <h3 style="margin-bottom: 24px; font-weight: 700; color: #fff; text-align: center;">🖊️ Ghi danh trực tiếp</h3>
+    
+    <form method="POST" onsubmit="return confirmAction(this, 'Xác nhận ghi danh', 'Bạn có chắc chắn muốn ghi danh và kích hoạt khóa học này cho học viên ngay lập tức?', '🖊️')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      
+      <div class="form-group">
+        <label for="email">Email học viên <span style="color: var(--danger);">*</span></label>
+        <input type="email" id="email" name="email" value="{{ prefill_email }}" required placeholder="Nhập địa chỉ email học viên đã có tài khoản" style="font-weight: 600;">
+        <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block;">Học viên phải được đăng ký tài khoản trước khi thực hiện ghi danh.</span>
+      </div>
+
+      <div class="form-group">
+        <label for="course_id">Chọn khóa học <span style="color: var(--danger);">*</span></label>
+        <select id="course_id" name="course_id" required style="font-weight: 500;">
+          <option value="" disabled {% if not prefill_email %}selected{% endif %}>-- Chọn khóa học muốn tham gia --</option>
+          {% for c in courses %}
+            <option value="{{ c.id }}">{{ c.title }} — [{{ "{:,}".format(c.price) }} VND]</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="background: rgba(16, 185, 129, 0.05); border: 1px dashed rgba(16, 185, 129, 0.2); border-radius: 10px; padding: 16px; margin-bottom: 24px;">
+        <div style="display: flex; gap: 10px; align-items: flex-start;">
+          <span style="font-size: 1.2rem;">💰</span>
+          <div>
+            <h4 style="font-weight: 700; color: var(--success); font-size: 0.95rem; margin-bottom: 4px;">Kích hoạt tức thì (Thu tiền mặt)</h4>
+            <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">Quy trình này bỏ qua bước quét QR và thanh toán online. Sau khi nhấn Xác nhận, học viên sẽ được vào học trực tiếp ngay lập tức.</p>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width: 100%; font-size: 1rem; padding: 12px;">Xác nhận ghi danh & kích hoạt học viên</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
