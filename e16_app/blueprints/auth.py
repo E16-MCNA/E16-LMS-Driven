@@ -91,9 +91,10 @@ def home():
         return redirect(url_for("teacher.dashboard"))
     if current_user.role == "hoc_vu":
         return redirect(url_for("hoc_vu.dashboard"))
-    if current_user.role in ("le_tan", "ke_toan"):
-        # Stub: redirect to analytics for now
-        return redirect(url_for("analytics.dashboard"))
+    if current_user.role == "le_tan":
+        return redirect(url_for("le_tan.dashboard"))
+    if current_user.role == "ke_toan":
+        return redirect(url_for("ke_toan.dashboard"))
     return redirect(url_for("analytics.dashboard"))
 
 

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="top-header">
+  <div>
+    <a href="{{ url_for('le_tan.dashboard') }}" style="color: var(--primary); text-decoration: none; font-weight: 600; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px;">🔙 Quay lại Dashboard</a>
+    <h1>Tạo tài khoản Học viên mới</h1>
+    <p>Tiếp đón học viên mới ghi danh tại trung tâm. Mật khẩu tạm thời sẽ được cấp tự động.</p>
+  </div>
+</header>
+
+<div style="max-width: 500px; margin: 0 auto;">
+  <div class="card">
+    <h3 style="margin-bottom: 24px; font-weight: 700; color: #fff; text-align: center;">📝 Đăng ký hồ sơ học viên</h3>
+    
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      
+      <div class="form-group">
+        <label for="email">Địa chỉ Email học viên <span style="color: var(--danger);">*</span></label>
+        <input type="email" id="email" name="email" required placeholder="example@gmail.com">
+        <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block;">Học viên sẽ dùng email này để đăng nhập hệ thống E16.</span>
+      </div>
+
+      <div class="form-group">
+        <label for="phone">Số điện thoại</label>
+        <input type="text" id="phone" name="phone" placeholder="Nhập số điện thoại liên hệ">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 28px;">
+        <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text); font-weight: 500;">
+          <input type="checkbox" name="enroll_now" value="y" checked style="width: auto;">
+          <span>Ghi danh & kích hoạt khóa học ngay lập tức</span>
+        </label>
+        <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block; padding-left: 20px;">Tự động chuyển hướng đến màn hình ghi danh khóa học sau khi lưu tài khoản.</span>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width: 100%; font-size: 1rem; padding: 12px;">Đăng ký hồ sơ & Cấp tài khoản</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

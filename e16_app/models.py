@@ -119,6 +119,16 @@ class AuditLog(db.Model):
     ip_address = db.Column(db.String(45))
     created_at = db.Column(db.DateTime, default=_utcnow)
 
+    @property
+    def metadata_json(self):
+        import json
+        if not self.detail:
+            return {}
+        try:
+            return json.loads(self.detail)
+        except Exception:
+            return {}
+
 
 class Lesson(db.Model):
     __tablename__ = "lessons"

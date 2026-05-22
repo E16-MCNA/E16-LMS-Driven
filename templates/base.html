@@ -89,12 +89,27 @@
               <span>Duyệt khoá học</span>
             </a>
           {% elif current_user.role == 'le_tan' %}
-            <a href="{{ url_for('analytics.dashboard') }}" class="nav-item {% if request.blueprint == 'analytics' %}active{% endif %}">
-              <span>Dashboard</span>
+            <a href="{{ url_for('le_tan.dashboard') }}" class="nav-item {% if request.endpoint == 'le_tan.dashboard' %}active{% endif %}">
+              <span>Dashboard Lễ tân</span>
+            </a>
+            <a href="{{ url_for('le_tan.list_students') }}" class="nav-item {% if request.endpoint in ('le_tan.list_students', 'le_tan.student_detail') %}active{% endif %}">
+              <span>Tra cứu học viên</span>
+            </a>
+            <a href="{{ url_for('le_tan.create_student') }}" class="nav-item {% if request.endpoint == 'le_tan.create_student' %}active{% endif %}">
+              <span>Tạo học viên mới</span>
+            </a>
+            <a href="{{ url_for('le_tan.enroll_student') }}" class="nav-item {% if request.endpoint == 'le_tan.enroll_student' %}active{% endif %}">
+              <span>Đăng ký học tại quầy</span>
             </a>
           {% elif current_user.role == 'ke_toan' %}
-            <a href="{{ url_for('analytics.dashboard') }}" class="nav-item {% if request.blueprint == 'analytics' %}active{% endif %}">
-              <span>Dashboard</span>
+            <a href="{{ url_for('ke_toan.dashboard') }}" class="nav-item {% if request.endpoint == 'ke_toan.dashboard' %}active{% endif %}">
+              <span>Dashboard tài chính</span>
+            </a>
+            <a href="{{ url_for('ke_toan.reconciliation') }}" class="nav-item {% if request.endpoint == 'ke_toan.reconciliation' %}active{% endif %}">
+              <span>Đối soát thanh toán</span>
+            </a>
+            <a href="{{ url_for('ke_toan.revenue') }}" class="nav-item {% if request.endpoint == 'ke_toan.revenue' %}active{% endif %}">
+              <span>Sổ thu chi chi tiết</span>
             </a>
           {% endif %}
         </nav>
