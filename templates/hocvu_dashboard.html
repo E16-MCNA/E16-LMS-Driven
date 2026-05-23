@@ -3,25 +3,15 @@
 <header class="top-header">
   <div>
     <h1>Bảng điều khiển Học vụ</h1>
-    <p>Tổng quan hệ thống — tài khoản, khoá học, hoạt động.</p>
+    <p>Tổng quan hệ thống — duyệt khoá học, hoạt động.</p>
   </div>
 </header>
 
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 32px;">
   <div class="card" style="text-align: center; padding: 24px;">
-    <div style="font-size: 2rem; margin-bottom: 8px;">👥</div>
-    <div style="font-size: 2rem; font-weight: 800; color: var(--text-main);">{{ total_users }}</div>
-    <div style="font-size: 0.85rem; color: var(--text-muted);">Tổng người dùng</div>
-  </div>
-  <div class="card" style="text-align: center; padding: 24px;">
     <div style="font-size: 2rem; margin-bottom: 8px;">📋</div>
     <div style="font-size: 2rem; font-weight: 800; color: var(--primary);">{{ pending_courses }}</div>
     <div style="font-size: 0.85rem; color: var(--text-muted);">Khoá chờ duyệt</div>
-  </div>
-  <div class="card" style="text-align: center; padding: 24px;">
-    <div style="font-size: 2rem; margin-bottom: 8px;">✨</div>
-    <div style="font-size: 2rem; font-weight: 800; color: var(--success);">{{ accounts_created_today }}</div>
-    <div style="font-size: 0.85rem; color: var(--text-muted);">Tạo hôm nay</div>
   </div>
   <div class="card" style="text-align: center; padding: 24px;">
     <div style="font-size: 2rem; margin-bottom: 8px;">📚</div>
@@ -31,46 +21,6 @@
 </div>
 
 <div style="display: flex; gap: 12px; margin-bottom: 32px;">
-  <a href="{{ url_for('hoc_vu.create_account') }}" class="btn btn-primary">➕ Tạo tài khoản</a>
-  <a href="{{ url_for('hoc_vu.import_accounts_view') }}" class="btn btn-outline">📄 Import hàng loạt</a>
-  {% if pending_courses > 0 %}
-  <a href="{{ url_for('hoc_vu.pending_courses') }}" class="btn btn-outline">📋 Duyệt khoá học ({{ pending_courses }})</a>
-  {% endif %}
-</div>
-
-<div class="card">
-  <h2 style="margin-bottom: 20px;">Tài khoản tạo gần đây</h2>
-  {% if recent_users %}
-  <table class="table" style="width: 100%; border-collapse: collapse;">
-    <thead>
-      <tr style="text-align: left; border-bottom: 1px solid var(--card-border);">
-        <th style="padding: 12px;">Email</th>
-        <th style="padding: 12px;">Vai trò</th>
-        <th style="padding: 12px;">Ngày tạo</th>
-        <th style="padding: 12px;">Trạng thái</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for u in recent_users %}
-      <tr style="border-bottom: 1px solid var(--card-border);">
-        <td style="padding: 12px; font-weight: 600;">{{ u.email }}</td>
-        <td style="padding: 12px;">
-          <span class="badge" style="background: rgba(59, 130, 246, 0.1); color: var(--primary);">{{ u.role }}</span>
-        </td>
-        <td style="padding: 12px; color: var(--text-muted);">{{ u.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
-        <td style="padding: 12px;">
-          {% if u.must_change_password %}
-            <span class="badge" style="background: rgba(251, 191, 36, 0.1); color: #f59e0b;">Chờ đổi MK</span>
-          {% else %}
-            <span class="badge" style="background: rgba(34, 197, 94, 0.1); color: var(--success);">Đã kích hoạt</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <div class="empty-box">Chưa có tài khoản nào được tạo.</div>
-  {% endif %}
+  <a href="{{ url_for('hoc_vu.pending_courses') }}" class="btn btn-primary">📋 Duyệt khoá học ({{ pending_courses }})</a>
 </div>
 {% endblock %}

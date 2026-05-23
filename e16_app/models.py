@@ -119,6 +119,16 @@ class AuditLog(db.Model):
     ip_address = db.Column(db.String(45))
     created_at = db.Column(db.DateTime, default=_utcnow)
 
+    @property
+    def metadata_json(self):
+        import json
+        if not self.detail:
+            return {}
+        try:
+            return json.loads(self.detail)
+        except Exception:
+            return {}
+
 
 class Lesson(db.Model):
     __tablename__ = "lessons"
@@ -142,9 +152,18 @@ class Enrollment(db.Model):
     enrolled_at = db.Column(db.DateTime, default=_utcnow, nullable=False, index=True)
     status = db.Column(db.String(20), default="active", nullable=False, index=True)  # active, dropped, completed
 
+    # Ledger fields for payment accounting
+    amount_paid = db.Column(db.Integer, nullable=True)
+    payment_method = db.Column(db.String(50), nullable=True)
+    tx_code = db.Column(db.String(100), nullable=True)
+    approved_by = db.Column(db.String(36), db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    approved_at = db.Column(db.DateTime, nullable=True)
+    rejected_reason = db.Column(db.Text, nullable=True)
+    refunded_at = db.Column(db.DateTime, nullable=True)
+
     # ORM relationships for joinedload
     course = db.relationship("Course", lazy="select")
-    user = db.relationship("User", lazy="select")
+    user = db.relationship("User", lazy="select", foreign_keys=[user_id])
 
 
 class LearningLog(db.Model):
@@ -329,3 +348,24 @@ class BackgroundJob(db.Model):
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
     started_at = db.Column(db.DateTime)
     completed_at = db.Column(db.DateTime)
+
+
+class PaymentTransaction(db.Model):
+    __tablename__ = "payment_transactions"
+    id = db.Column(db.String(36), primary_key=True, default=new_uuid)
+    enrollment_id = db.Column(db.String(36), db.ForeignKey("enrollments.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=False, index=True)
+    course_id = db.Column(db.String(36), db.ForeignKey("courses.id"), nullable=False, index=True)
+    amount = db.Column(db.Integer, nullable=False)
+    payment_method = db.Column(db.String(50), nullable=False)
+    tx_code = db.Column(db.String(100), unique=False, index=True, nullable=True)
+    status = db.Column(db.String(20), default="pending", nullable=False, index=True)
+    processed_by = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=True, index=True)
+    processed_at = db.Column(db.DateTime, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+    enrollment = db.relationship("Enrollment", lazy="select", backref=db.backref("transactions", cascade="all, delete-orphan"))
+    user = db.relationship("User", lazy="select", foreign_keys=[user_id])
+    course = db.relationship("Course", lazy="select", foreign_keys=[course_id])
+    processor = db.relationship("User", lazy="select", foreign_keys=[processed_by])

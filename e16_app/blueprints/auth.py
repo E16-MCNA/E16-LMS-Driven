@@ -11,6 +11,7 @@ from ..extensions import db, oauth, limiter
 from ..models import Course, Enrollment, LearningLog, Lesson, User
 from ..services.course import recalc_total_lessons
 from ..services.logging import logger
+from ..urls import app_url_for
 
 bp = Blueprint("auth", __name__)
 
@@ -24,7 +25,7 @@ def oauth_login(name):
     client = oauth.create_client(name)
     if not client:
         return redirect(url_for("auth.login"))
-    redirect_uri = url_for("auth.oauth_authorize", name=name, _external=True)
+    redirect_uri = app_url_for("auth.oauth_authorize", name=name)
     return client.authorize_redirect(redirect_uri)
 
 
@@ -33,7 +34,7 @@ def oauth_authorize(name):
     client = oauth.create_client(name)
     if not client:
         return redirect(url_for("auth.login"))
-    
+
     try:
         token = client.authorize_access_token()
     except Exception as e:
@@ -45,7 +46,7 @@ def oauth_authorize(name):
     if not user_info:
         # Fallback for non-OIDC or if userinfo not in token
         user_info = client.get("userinfo").json()
-        
+
     if not user_info or not user_info.get("email"):
         flash("Không thể lấy thông tin email từ nhà cung cấp.", "error")
         return redirect(url_for("auth.login"))
@@ -91,9 +92,10 @@ def home():
         return redirect(url_for("teacher.dashboard"))
     if current_user.role == "hoc_vu":
         return redirect(url_for("hoc_vu.dashboard"))
-    if current_user.role in ("le_tan", "ke_toan"):
-        # Stub: redirect to analytics for now
-        return redirect(url_for("analytics.dashboard"))
+    if current_user.role == "le_tan":
+        return redirect(url_for("le_tan.dashboard"))
+    if current_user.role == "ke_toan":
+        return redirect(url_for("ke_toan.dashboard"))
     return redirect(url_for("analytics.dashboard"))
 
 
@@ -187,7 +189,7 @@ def forgot_password():
             user.reset_token = token
             user.reset_token_expiry = _utcnow() + timedelta(hours=1)
             db.session.commit()
-            reset_url = url_for("auth.reset_password", token=token, _external=True)
+            reset_url = app_url_for("auth.reset_password", token=token)
             # Gửi email thật nếu SMTP đã cấu hình
             _send_reset_email(email, reset_url)
         # Security: luôn trả về thông báo chung để chống email enumeration
@@ -225,7 +227,7 @@ def reset_password(token):
     if not user:
         flash("Liên kết không hợp lệ hoặc đã hết hạn.", "error")
         return redirect(url_for("auth.login"))
-    
+
     if request.method == "POST":
         password = request.form.get("password", "")
         if not password or len(password) < 8:
@@ -247,9 +249,9 @@ def _run_seed(seed_password):
     """Core seed logic — shared between HTTP route and CLI command."""
     import random
     from ..models import Category
-    
-    db.create_all() 
-    
+
+    db.create_all()
+
     cats_data = [
         ("Technology", "tech", "💻"),
         ("Design", "design", "🎨"),
@@ -266,13 +268,24 @@ def _run_seed(seed_password):
         categories[slug] = cat
 
     # 1. Create Core Test Users (User Request)
-    core_users = [
-        ("admin@e16.local", "admine16", "admin"),
-        ("teacher@e16.local", "teachere16", "teacher"),
-        ("student@e16.local", "studente16", "student"),
-        ("hocvu@e16.local", "hocvue16", "hoc_vu"),
-    ]
-    
+    app_env = os.getenv("APP_ENV", os.getenv("FLASK_ENV", "production")).lower()
+    is_local = not os.environ.get("VERCEL") and app_env in ("development", "testing")
+
+    if is_local:
+        core_users = [
+            ("admin_local@e16.local", "admin_local_pass", "admin"),
+            ("teacher_local@e16.local", "teacher_local_pass", "teacher"),
+            ("student_local@e16.local", "student_local_pass", "student"),
+            ("hocvu_local@e16.local", "hocvu_local_pass", "hoc_vu"),
+        ]
+    else:
+        core_users = [
+            ("admin@e16.local", "admine16", "admin"),
+            ("teacher@e16.local", "teachere16", "teacher"),
+            ("student@e16.local", "studente16", "student"),
+            ("hocvu@e16.local", "hocvue16", "hoc_vu"),
+        ]
+
     teacher = None
     for email, pwd, role in core_users:
         u = db.session.query(User).filter_by(email=email).first()
@@ -289,9 +302,10 @@ def _run_seed(seed_password):
 
     # 2. Extra students for variety
     for i in range(1, 6):
-        email = f"student{i}@e16.local"
+        email = f"student_local{i}@e16.local" if is_local else f"student{i}@e16.local"
+        pwd = "student_local_pass" if is_local else seed_password
         if not db.session.query(User).filter_by(email=email).first():
-            db.session.add(User(email=email, password_hash=generate_password_hash(seed_password),
+            db.session.add(User(email=email, password_hash=generate_password_hash(pwd),
                                 role="student", must_change_password=False))
     db.session.commit()
 
@@ -301,14 +315,14 @@ def _run_seed(seed_password):
         ("Financial Freedom", "Tự do tài chính", "Quản lý tài chính cá nhân hiệu quả và bền vững.", "https://images.unsplash.com/photo-1554224155-6726b3ff858f", "business"),
         ("Digital Marketing 101", "Marketing số cơ bản", "Bùng nổ doanh số với Marketing số đa kênh.", "https://images.unsplash.com/photo-1460925895917-afdab827c52f", "marketing")
     ]
-    
+
     for title, short_desc, desc, img, cat_slug in course_data:
         if not db.session.query(Course).filter(Course.title == title).first():
             c = Course(
-                title=title, 
+                title=title,
                 short_description=short_desc,
-                description=desc, 
-                cover_image_url=img, 
+                description=desc,
+                cover_image_url=img,
                 teacher_id=teacher.id,
                 category_id=categories[cat_slug].id,
                 status="published"
@@ -323,13 +337,13 @@ def _run_seed(seed_password):
 
     all_students = db.session.query(User).filter(User.role == "student").all()
     all_courses = db.session.query(Course).all()
-    
+
     if all_students and all_courses:
         for s in all_students:
             log_exists = db.session.query(LearningLog).filter_by(user_id=s.id).first()
             if log_exists:
                 continue
-                
+
             k_val = random.randint(1, len(all_courses))
             for c in random.sample(all_courses, k=k_val):
                 exists = db.session.query(Enrollment).filter_by(user_id=s.id, course_id=c.id).first()

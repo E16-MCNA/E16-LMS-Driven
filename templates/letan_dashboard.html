@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="top-header">
+  <div>
+    <h1>Quầy Tiếp Đón Lễ Tân</h1>
+    <p>Chào mừng quay trở lại! Dưới đây là hoạt động đăng ký học tập hôm nay.</p>
+  </div>
+</header>
+
+<div class="stats-grid">
+  <div class="card stat-card">
+    <div style="font-size: 2.5rem; margin-bottom: 8px;">👥</div>
+    <div class="stat-value">{{ total_students }}</div>
+    <div class="stat-label">Học viên hệ thống</div>
+  </div>
+  <div class="card stat-card">
+    <div style="font-size: 2.5rem; margin-bottom: 8px;">📚</div>
+    <div class="stat-value" style="color: var(--primary);">{{ active_courses }}</div>
+    <div class="stat-label">Khóa đang chạy</div>
+  </div>
+  <div class="card stat-card">
+    <div style="font-size: 2.5rem; margin-bottom: 8px;">✨</div>
+    <div class="stat-value" style="color: var(--success);">{{ total_enrollments }}</div>
+    <div class="stat-label">Tổng lượt tham gia</div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 32px;">
+  <h3 style="margin-bottom: 16px; font-weight: 700; color: #fff;">⚡ Nghiệp vụ hỗ trợ tại Quầy</h3>
+  <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+    <a href="{{ url_for('le_tan.create_student') }}" class="btn btn-primary">➕ Tạo học viên mới</a>
+    <a href="{{ url_for('le_tan.enroll_student') }}" class="btn btn-outline">🖊️ Đăng ký học tại quầy (Tiền mặt)</a>
+    <a href="{{ url_for('le_tan.list_students') }}" class="btn btn-outline">🔍 Tra cứu hồ sơ học viên</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2 style="margin-bottom: 20px; font-weight: 700;">👤 Học viên đăng ký gần đây</h2>
+  {% if recent_students %}
+  <div style="overflow-x: auto;">
+    <table class="table" style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr style="text-align: left; border-bottom: 1px solid var(--card-border);">
+          <th style="padding: 12px;">Email</th>
+          <th style="padding: 12px;">Số điện thoại</th>
+          <th style="padding: 12px;">Ngày tham gia</th>
+          <th style="padding: 12px;">Hành động</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in recent_students %}
+        <tr style="border-bottom: 1px solid var(--card-border);">
+          <td style="padding: 12px; font-weight: 600;">{{ s.email }}</td>
+          <td style="padding: 12px; color: var(--text-muted);">{{ s.phone or 'Chưa cập nhật' }}</td>
+          <td style="padding: 12px; color: var(--text-muted);">{{ s.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td style="padding: 12px;">
+            <a href="{{ url_for('le_tan.student_detail', user_id=s.id) }}" class="btn btn-outline btn-sm">Xem hồ sơ</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-box" style="text-align: center; padding: 40px; color: var(--text-muted);">
+    Chưa có tài khoản học viên nào được ghi nhận.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

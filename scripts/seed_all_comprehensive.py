@@ -6,10 +6,10 @@ from werkzeug.security import generate_password_hash
 from e16_app import create_app
 from e16_app.extensions import db
 from e16_app.models import (
-    User, Category, Course, SystemSetting, Lesson, 
-    Enrollment, LearningLog, Quiz, Question, Choice, 
-    QuizAttempt, QuizAnswer, Assignment, Submission, 
-    Notification, Announcement, ForumThread, ForumReply, 
+    User, Category, Course, SystemSetting, Lesson,
+    Enrollment, LearningLog, Quiz, Question, Choice,
+    QuizAttempt, QuizAnswer, Assignment, Submission,
+    Notification, Announcement, ForumThread, ForumReply,
     Certificate, AuditLog, new_uuid
 )
 from supabase import create_client
@@ -25,10 +25,10 @@ def run_comprehensive_seed():
     app = create_app()
     with app.app_context():
         print("🚀 BẮT ĐẦU QUÁ TRÌNH SEED DỮ LIỆU TOÀN DIỆN 🚀")
-        
+
         # 1. Đảm bảo các bảng tồn tại (tự động tạo bảng thiếu)
         db.create_all()
-        
+
         # 2. SEED SYSTEM SETTINGS & CATEGORIES
         print("1️⃣ Khởi tạo Cấu hình hệ thống & Danh mục...")
         settings_data = [
@@ -56,12 +56,24 @@ def run_comprehensive_seed():
 
         # 3. SEED CORE USERS (Admin, Core Teacher, Core Student)
         print("2️⃣ Khởi tạo Tài khoản Core (Admin/Teacher/Student)...")
-        core_users = [
-            ("admin@e16.local", "admine16", "admin"),
-            ("teacher@e16.local", "teachere16", "teacher"),
-            ("student@e16.local", "studente16", "student")
-        ]
-        
+        app_env = os.getenv("APP_ENV", os.getenv("FLASK_ENV", "production")).lower()
+        is_local = not os.environ.get("VERCEL") and app_env in ("development", "testing")
+
+        if is_local:
+            core_users = [
+                ("admin_local@e16.local", "admin_local_pass", "admin"),
+                ("teacher_local@e16.local", "teacher_local_pass", "teacher"),
+                ("student_local@e16.local", "student_local_pass", "student"),
+                ("hocvu_local@e16.local", "hocvu_local_pass", "hoc_vu")
+            ]
+        else:
+            core_users = [
+                ("admin@e16.local", "admine16", "admin"),
+                ("teacher@e16.local", "teachere16", "teacher"),
+                ("student@e16.local", "studente16", "student"),
+                ("hocvu@e16.local", "hocvue16", "hoc_vu")
+            ]
+
         core_objects = {}
         for email, pwd, role in core_users:
             u = db.session.query(User).filter_by(email=email).first()
@@ -69,10 +81,10 @@ def run_comprehensive_seed():
             created_time = last_login_time - timedelta(days=random.randint(30, 60))
             if not u:
                 u = User(
-                    email=email, 
-                    password_hash=generate_password_hash(pwd), 
-                    role=role, 
-                    is_active=True, 
+                    email=email,
+                    password_hash=generate_password_hash(pwd),
+                    role=role,
+                    is_active=True,
                     phone="0988123456",
                     created_at=created_time,
                     last_login=last_login_time,
@@ -97,8 +109,8 @@ def run_comprehensive_seed():
             last_login_time = datetime.now(timezone.utc) - timedelta(days=random.randint(1, 15), hours=random.randint(0, 23))
             created_time = last_login_time - timedelta(days=random.randint(10, 50))
             t = User(
-                email=f"teacher_gen_{batch_id}_{i}@e16.local", 
-                password_hash=generate_password_hash("123456"), 
+                email=f"teacher_gen_{batch_id}_{i}@e16.local",
+                password_hash=generate_password_hash("123456"),
                 role="teacher",
                 phone=phone_num,
                 created_at=created_time,
@@ -107,15 +119,15 @@ def run_comprehensive_seed():
             )
             db.session.add(t)
             teachers.append(t)
-            
+
         students = [core_objects["student"]]
         for i in range(20): # Seed 20 học viên test
             phone_num = f"09{random.randint(10000000, 99999999)}"
             last_login_time = datetime.now(timezone.utc) - timedelta(days=random.randint(1, 20), hours=random.randint(0, 23))
             created_time = last_login_time - timedelta(days=random.randint(5, 40))
             s = User(
-                email=f"student_gen_{batch_id}_{i}@e16.local", 
-                password_hash=generate_password_hash("123456"), 
+                email=f"student_gen_{batch_id}_{i}@e16.local",
+                password_hash=generate_password_hash("123456"),
                 role="student",
                 phone=phone_num,
                 created_at=created_time,
@@ -150,22 +162,22 @@ def run_comprehensive_seed():
         updated_count = 0
         for u in all_users:
             needs_update = False
-            
+
             # 1. Điền số điện thoại nếu trống
             if not u.phone or len(u.phone.strip()) < 8:
                 u.phone = f"09{random.randint(10000000, 99999999)}"
                 needs_update = True
-                
+
             # 2. Xử lý mâu thuẫn ngày tham gia và lần đăng nhập cuối
             # Chuyển all datetimes sang naive để so sánh an toàn
             current_date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             user_created_str = u.created_at.strftime("%Y-%m-%d") if u.created_at else current_date_str
-            
+
             if not u.created_at or user_created_str == current_date_str:
                 # Gán ngày tham gia ngẫu nhiên trong vòng 1-6 tháng qua
                 u.created_at = (datetime.now(timezone.utc) - timedelta(days=random.randint(30, 180), hours=random.randint(0, 23))).replace(tzinfo=None)
                 needs_update = True
-                
+
             if u.last_login:
                 last_login_naive = u.last_login.replace(tzinfo=None)
                 created_at_naive = u.created_at.replace(tzinfo=None)
@@ -177,10 +189,10 @@ def run_comprehensive_seed():
                     u.last_login = (u.created_at.replace(tzinfo=None) + timedelta(days=random.randint(1, 15), hours=random.randint(1, 23)))
                     u.login_count = u.login_count or random.randint(1, 25)
                     needs_update = True
-                    
+
             if needs_update:
                 updated_count += 1
-                
+
         db.session.commit()
         print(f"✅ Đã dọn dẹp và cập nhật thành công {updated_count} user có sẵn trong database!")
 
@@ -219,12 +231,12 @@ def run_comprehensive_seed():
                     l = Lesson(course_id=course.id, title=f"Bài {l_idx + 1}: Lý thuyết cốt lõi", sequence_order=l_idx + 1)
                     db.session.add(l)
                     course_lessons.append(l)
-                
+
                 # Quiz
                 quiz = Quiz(course_id=course.id, title="Kiểm tra trắc nghiệm cuối khóa", pass_score=60, max_attempts=3, is_published=True)
                 db.session.add(quiz)
                 db.session.commit()
-                
+
                 for q_idx in range(3):
                     q = Question(quiz_id=quiz.id, text=f"Câu hỏi số {q_idx + 1} có nội dung là gì?", q_type="mcq")
                     db.session.add(q)
@@ -236,7 +248,7 @@ def run_comprehensive_seed():
                 # Assignment
                 assign = Assignment(course_id=course.id, title="Bài tập thực hành", description="Nộp file word hoặc pdf.", deadline=datetime.now(timezone.utc) + timedelta(days=7))
                 db.session.add(assign)
-                
+
         db.session.commit()
 
         # 6. SEED ENROLLMENTS, LOGS, SUBMISSIONS & CERTIFICATES
@@ -246,19 +258,19 @@ def run_comprehensive_seed():
             for course in random.sample(all_courses, min(3, len(all_courses))):
                 enroll = Enrollment(user_id=student.id, course_id=course.id, status="active", enrolled_at=datetime.now(timezone.utc) - timedelta(days=10))
                 db.session.add(enroll)
-                
+
                 # Learning logs
                 lessons = Lesson.query.filter_by(course_id=course.id).all()
                 completed_lessons = random.randint(1, len(lessons))
                 for i in range(completed_lessons):
                     db.session.add(LearningLog(user_id=student.id, lesson_id=lessons[i].id, action_type="start"))
                     db.session.add(LearningLog(user_id=student.id, lesson_id=lessons[i].id, action_type="complete"))
-                
+
                 # Nếu hoàn thành 100% lessons -> Cấp chứng chỉ
                 if completed_lessons == len(lessons):
                     enroll.status = "completed"
                     db.session.add(Certificate(user_id=student.id, course_id=course.id))
-                
+
                 # Quiz Attempts
                 quiz = Quiz.query.filter_by(course_id=course.id).first()
                 if quiz and random.random() > 0.5:
@@ -292,7 +304,7 @@ def run_comprehensive_seed():
                         "login_count": u.login_count or 0,
                         "created_at": u.created_at.isoformat() if u.created_at else datetime.now(timezone.utc).isoformat()
                     })
-                
+
                 # Batch upsert with schema-mismatch self-healing fallback
                 try:
                     for i in range(0, len(sb_users), 100):
@@ -311,12 +323,12 @@ def run_comprehensive_seed():
                     else:
                         raise e
                 print("✅ Đồng bộ Users lên Supabase thành công!")
-                
+
             except Exception as e:
                 print(f"❌ Lỗi khi đồng bộ Supabase: {e}")
         else:
             print("⚠️ Bỏ qua bước đồng bộ Supabase (chưa cấu hình trong .env).")
-            
+
         print("🎉 HOÀN TẤT! Dữ liệu đã sẵn sàng để demo/test toàn diện.")
 
 if __name__ == "__main__":

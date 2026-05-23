@@ -5,6 +5,8 @@ scratch/
 *.sqlite3
 *.csv
 .env
+.env*
+.coverage
 .pytest_cache/
 backups/
 learning_logs_export.csv

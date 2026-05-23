@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
-<header class="top-header">
+<header class="top-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
   <div>
     <h1>Quản lý người dùng</h1>
     <p>Xem và quản lý tất cả tài khoản trong hệ thống.</p>
   </div>
-  <div class="actions">
-    <a href="{{ url_for('hoc_vu.create_account') }}" class="btn btn-primary">➕ Tạo người dùng mới</a>
+  <div style="display: flex; gap: 12px;">
+    <a href="{{ url_for('admin.create_user') }}" class="btn btn-primary">➕ Tạo người dùng mới</a>
+    <a href="{{ url_for('admin.import_users_view') }}" class="btn btn-outline">📄 Import hàng loạt</a>
   </div>
 </header>
 

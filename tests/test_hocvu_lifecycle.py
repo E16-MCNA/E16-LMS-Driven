@@ -178,248 +178,38 @@ class TestForcePasswordChange:
 #           3. HỌC VỤ — SINGLE ACCOUNT CREATION
 # ═══════════════════════════════════════════════════════════
 
-class TestHocVuAccountCreation:
-    """Test Học vụ single account creation flow."""
+class TestHocVuAccountManagementForbidden:
+    """Verify that Hoc vu is forbidden/blocked from account creation and import endpoints, which now return 404."""
 
-    @pytest.mark.integration
-    def test_create_student_account(self, client, app):
-        """Học vụ can create a student account."""
-        hv_id = _mk(app, "hv@test.com", "hoc_vu")
+    @pytest.mark.security
+    def test_hocvu_cannot_access_create_user(self, client, app):
+        _mk(app, "hv@test.com", "hoc_vu")
         _login(client, "hv@test.com")
+        response = client.get("/hoc-vu/accounts/create")
+        assert response.status_code == 404
 
         response = client.post("/hoc-vu/accounts/create", data={
-            "email": "newstudent@test.com",
+            "email": "shouldfail@test.com",
             "role": "student",
-            "full_name": "Student Test",
-        }, follow_redirects=True)
+        })
+        assert response.status_code == 404
 
-        assert response.status_code == 200
-
-        with app.app_context():
-            user = db.session.query(User).filter_by(email="newstudent@test.com").first()
-            assert user is not None
-            assert user.role == "student"
-            assert user.must_change_password is True
-            assert user.created_by == hv_id
-
-    @pytest.mark.integration
-    def test_create_teacher_account(self, client, app):
-        """Học vụ can create a teacher account."""
+    @pytest.mark.security
+    def test_hocvu_cannot_access_import_users(self, client, app):
         _mk(app, "hv@test.com", "hoc_vu")
         _login(client, "hv@test.com")
+        response = client.get("/hoc-vu/accounts/import")
+        assert response.status_code == 404
 
-        response = client.post("/hoc-vu/accounts/create", data={
-            "email": "newteacher@test.com",
-            "role": "teacher",
-        }, follow_redirects=True)
+        response = client.post("/hoc-vu/accounts/import", data={})
+        assert response.status_code == 404
 
-        assert response.status_code == 200
-
-        with app.app_context():
-            user = db.session.query(User).filter_by(email="newteacher@test.com").first()
-            assert user is not None
-            assert user.role == "teacher"
-
-    @pytest.mark.integration
-    def test_reset_temp_password_for_created_account(self, client, app, monkeypatch):
-        """Hoc vu can issue a new temporary password when the first one is lost."""
-        hv_id = _mk(app, "hv@test.com", "hoc_vu")
-        _login(client, "hv@test.com")
-
-        with app.app_context():
-            user = User(
-                email="frontdesk@test.com",
-                password_hash=generate_password_hash("oldtemp123"),
-                role="le_tan",
-                must_change_password=True,
-                created_by=hv_id,
-                temp_password_hash=generate_password_hash("oldtemp123"),
-            )
-            db.session.add(user)
-            db.session.commit()
-            user_id = user.id
-
-        monkeypatch.setattr("e16_app.blueprints.hoc_vu._gen_temp_password", lambda length=10: "newtemp123")
-        response = client.post(f"/hoc-vu/accounts/{user_id}/reset-temp-password", follow_redirects=True)
-
-        assert response.status_code == 200
-        assert b"newtemp123" in response.data
-        with app.app_context():
-            user = db.session.get(User, user_id)
-            assert user.must_change_password is True
-            assert user.is_active is True
-            assert check_password_hash(user.password_hash, "newtemp123")
-            assert check_password_hash(user.temp_password_hash, "newtemp123")
-
-    @pytest.mark.integration
-    def test_cannot_create_admin_account(self, client, app):
-        """Học vụ should NOT be able to create admin accounts."""
+    @pytest.mark.security
+    def test_hocvu_cannot_access_reset_password(self, client, app):
         _mk(app, "hv@test.com", "hoc_vu")
         _login(client, "hv@test.com")
-
-        response = client.post("/hoc-vu/accounts/create", data={
-            "email": "newadmin@test.com",
-            "role": "admin",
-        }, follow_redirects=True)
-
-        assert response.status_code == 200
-
-        with app.app_context():
-            user = db.session.query(User).filter_by(email="newadmin@test.com").first()
-            assert user is None
-
-    @pytest.mark.integration
-    def test_cannot_create_hocvu_account(self, client, app):
-        """Học vụ should NOT be able to create another hoc_vu account."""
-        _mk(app, "hv@test.com", "hoc_vu")
-        _login(client, "hv@test.com")
-
-        response = client.post("/hoc-vu/accounts/create", data={
-            "email": "hv2@test.com",
-            "role": "hoc_vu",
-        }, follow_redirects=True)
-
-        assert response.status_code == 200
-
-        with app.app_context():
-            user = db.session.query(User).filter_by(email="hv2@test.com").first()
-            assert user is None
-
-    @pytest.mark.integration
-    def test_duplicate_email_rejected(self, client, app):
-        """Creating account with existing email should fail."""
-        _mk(app, "hv@test.com", "hoc_vu")
-        _mk(app, "exists@test.com", "student")
-        _login(client, "hv@test.com")
-
-        response = client.post("/hoc-vu/accounts/create", data={
-            "email": "exists@test.com",
-            "role": "student",
-        }, follow_redirects=True)
-
-        assert response.status_code == 200
-
-        with app.app_context():
-            count = db.session.query(User).filter_by(email="exists@test.com").count()
-            assert count == 1  # No duplicate created
-
-    @pytest.mark.integration
-    def test_create_with_course_enrollment(self, client, app):
-        """Creating student with course_id should auto-enroll."""
-        hv_id = _mk(app, "hv@test.com", "hoc_vu")
-        teacher_id = _mk(app, "teacher@test.com", "teacher")
-        course_id = _mk_course(app, teacher_id, status="published")
-        _login(client, "hv@test.com")
-
-        response = client.post("/hoc-vu/accounts/create", data={
-            "email": "enrolled@test.com",
-            "role": "student",
-            "course_id": course_id,
-        }, follow_redirects=True)
-
-        assert response.status_code == 200
-
-        with app.app_context():
-            user = db.session.query(User).filter_by(email="enrolled@test.com").first()
-            enrollment = db.session.query(Enrollment).filter_by(
-                user_id=user.id, course_id=course_id
-            ).first()
-            assert enrollment is not None
-            assert enrollment.status == "active"
-
-# ═══════════════════════════════════════════════════════════
-#           4. HỌC VỤ — CSV IMPORT
-# ═══════════════════════════════════════════════════════════
-
-class TestHocVuCSVImport:
-    """Test CSV bulk import functionality."""
-
-    def _make_csv(self, rows):
-        """Build an in-memory CSV file from list of dicts."""
-        si = io.StringIO()
-        writer = csv.DictWriter(si, fieldnames=rows[0].keys())
-        writer.writeheader()
-        writer.writerows(rows)
-        si.seek(0)
-        return (io.BytesIO(si.getvalue().encode("utf-8")), "import.csv")
-
-    @pytest.mark.integration
-    def test_csv_import_success(self, client, app):
-        """Valid CSV should create users."""
-        _mk(app, "hv@test.com", "hoc_vu")
-        _login(client, "hv@test.com")
-
-        csv_data, filename = self._make_csv([
-            {"email": "csv1@test.com", "role": "student"},
-            {"email": "csv2@test.com", "role": "teacher"},
-        ])
-
-        response = client.post("/hoc-vu/accounts/import", data={
-            "file": (csv_data, filename),
-        }, content_type="multipart/form-data", follow_redirects=True)
-
-        assert response.status_code == 200
-
-        with app.app_context():
-            u1 = db.session.query(User).filter_by(email="csv1@test.com").first()
-            u2 = db.session.query(User).filter_by(email="csv2@test.com").first()
-            assert u1 is not None and u1.role == "student"
-            assert u2 is not None and u2.role == "teacher"
-            assert u1.must_change_password is True
-            assert u2.must_change_password is True
-
-    @pytest.mark.integration
-    def test_csv_import_duplicate_skipped(self, client, app):
-        """Existing emails in CSV should be skipped, not cause errors."""
-        _mk(app, "hv@test.com", "hoc_vu")
-        _mk(app, "exists@test.com", "student")
-        _login(client, "hv@test.com")
-
-        csv_data, filename = self._make_csv([
-            {"email": "exists@test.com", "role": "student"},
-            {"email": "new@test.com", "role": "student"},
-        ])
-
-        response = client.post("/hoc-vu/accounts/import", data={
-            "file": (csv_data, filename),
-        }, content_type="multipart/form-data", follow_redirects=True)
-
-        assert response.status_code == 200
-
-        with app.app_context():
-            assert db.session.query(User).filter_by(email="exists@test.com").count() == 1
-            assert db.session.query(User).filter_by(email="new@test.com").first() is not None
-
-    @pytest.mark.integration
-    def test_csv_import_invalid_role(self, client, app):
-        """Invalid roles in CSV should be rejected per-row."""
-        _mk(app, "hv@test.com", "hoc_vu")
-        _login(client, "hv@test.com")
-
-        csv_data, filename = self._make_csv([
-            {"email": "bad@test.com", "role": "superuser"},
-            {"email": "good@test.com", "role": "student"},
-        ])
-
-        response = client.post("/hoc-vu/accounts/import", data={
-            "file": (csv_data, filename),
-        }, content_type="multipart/form-data", follow_redirects=True)
-
-        assert response.status_code == 200
-
-        with app.app_context():
-            assert db.session.query(User).filter_by(email="bad@test.com").first() is None
-            assert db.session.query(User).filter_by(email="good@test.com").first() is not None
-
-    @pytest.mark.integration
-    def test_csv_import_no_file(self, client, app):
-        """Import without file should redirect back."""
-        _mk(app, "hv@test.com", "hoc_vu")
-        _login(client, "hv@test.com")
-
-        response = client.post("/hoc-vu/accounts/import", data={},
-                               follow_redirects=True)
-        assert response.status_code == 200
+        response = client.post("/hoc-vu/accounts/1/reset-temp-password")
+        assert response.status_code == 404
 
 # ═══════════════════════════════════════════════════════════
 #           5. COURSE LIFECYCLE STATE MACHINE
@@ -560,7 +350,7 @@ class TestHocVuCourseApproval:
 
         with app.app_context():
             course = db.session.get(Course, course_id)
-            assert course.status == "approved"
+            assert course.status == "published"
 
     @pytest.mark.integration
     def test_reject_course_with_note(self, client, app):
@@ -616,13 +406,16 @@ class TestNewRoleAccess:
 
         urls = [
             "/hoc-vu/dashboard",
-            "/hoc-vu/accounts/create",
-            "/hoc-vu/accounts/import",
             "/hoc-vu/courses/pending",
         ]
         for url in urls:
             response = client.get(url)
             assert response.status_code == 302, f"Student should be blocked from {url}"
+
+        # Old account endpoints should be 404
+        for url in ["/hoc-vu/accounts/create", "/hoc-vu/accounts/import"]:
+            response = client.get(url)
+            assert response.status_code == 404
 
     @pytest.mark.security
     def test_teacher_cannot_access_hocvu_routes(self, client, app):
@@ -641,14 +434,16 @@ class TestNewRoleAccess:
 
         urls = [
             "/hoc-vu/dashboard",
-            "/hoc-vu/accounts/create",
-            "/hoc-vu/accounts/import",
             "/hoc-vu/courses/pending",
-            "/hoc-vu/accounts",
         ]
         for url in urls:
             response = client.get(url)
             assert response.status_code == 200, f"Học vụ should access {url}"
+
+        # Old account endpoints should be 404
+        for url in ["/hoc-vu/accounts/create", "/hoc-vu/accounts/import", "/hoc-vu/accounts"]:
+            response = client.get(url)
+            assert response.status_code == 404
 
     @pytest.mark.security
     def test_admin_can_access_hocvu_routes(self, client, app):
@@ -726,16 +521,16 @@ class TestHocVuDashboard:
 # ═══════════════════════════════════════════════════════════
 
 class TestEndToEndAccountLifecycle:
-    """E2E: Học vụ creates account → user forced to change password → user logs in normally."""
+    """E2E: Admin creates account → user forced to change password → user logs in normally."""
 
     @pytest.mark.integration
     def test_full_lifecycle(self, client, app):
         """Complete lifecycle: create → login → force change → login again."""
-        # 1. Học vụ creates account
-        _mk(app, "hv@test.com", "hoc_vu")
-        _login(client, "hv@test.com")
+        # 1. Admin creates account
+        _mk(app, "admin@test.com", "admin")
+        _login(client, "admin@test.com")
 
-        client.post("/hoc-vu/accounts/create", data={
+        client.post("/admin/users/create", data={
             "email": "lifecycle@test.com",
             "role": "student",
         })
@@ -746,7 +541,7 @@ class TestEndToEndAccountLifecycle:
             assert user is not None
             assert user.must_change_password is True
 
-        # 2. Logout Học vụ
+        # 2. Logout Admin
         client.get("/auth/logout")
 
         # 3. Login as new user (we need to know the temp password - check DB password_hash)

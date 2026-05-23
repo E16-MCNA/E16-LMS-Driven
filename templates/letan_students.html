@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% if student %}
+<!-- 👤 CHI TIẾT HỒ SƠ HỌC VIÊN -->
+<header class="top-header">
+  <div>
+    <a href="{{ url_for('le_tan.list_students') }}" style="color: var(--primary); text-decoration: none; font-weight: 600; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px;">🔙 Quay lại tra cứu</a>
+    <h1>Hồ sơ Học viên: {{ student.email.split('@')[0] }}</h1>
+    <p>Quản lý thông tin liên hệ và theo dõi tiến độ khóa học.</p>
+  </div>
+</header>
+
+<div style="display: grid; grid-template-columns: 1fr 2fr; gap: 24px;">
+  <!-- Left Side: Profile Edit -->
+  <div class="card" style="height: fit-content;">
+    <h3 style="margin-bottom: 20px; font-weight: 700; color: #fff;">Thông tin cá nhân</h3>
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label>Địa chỉ Email</label>
+        <input type="text" value="{{ student.email }}" disabled style="background: rgba(255,255,255,0.05); color: var(--text-muted);">
+      </div>
+      <div class="form-group">
+        <label for="phone">Số điện thoại</label>
+        <input type="text" id="phone" name="phone" value="{{ student.phone or '' }}" placeholder="Chưa cập nhật SĐT">
+      </div>
+      <div class="form-group" style="margin-bottom: 24px;">
+        <label>Trạng thái hoạt động</label>
+        <div style="display: flex; gap: 16px; align-items: center; margin-top: 8px;">
+          <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text);">
+            <input type="radio" name="is_active" value="y" {% if student.is_active %}checked{% endif %} style="width: auto; margin-right: 4px;"> Kích hoạt
+          </label>
+          <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text);">
+            <input type="radio" name="is_active" value="n" {% if not student.is_active %}checked{% endif %} style="width: auto; margin-right: 4px;"> Vô hiệu hóa
+          </label>
+        </div>
+      </div>
+      
+      <button type="submit" class="btn btn-primary" style="width: 100%;">Lưu thay đổi</button>
+    </form>
+    
+    <div style="margin-top: 24px; border-top: 1px solid var(--card-border); padding-top: 20px; text-align: center; display: flex; flex-direction: column; gap: 12px;">
+      <a href="{{ url_for('le_tan.enroll_student', email=student.email) }}" class="btn btn-outline" style="width: 100%;">🖊️ Đăng ký khóa học mới</a>
+      <form action="{{ url_for('le_tan.reset_student_password', user_id=student.id) }}" method="POST" style="display: inline; width: 100%;" onsubmit="return confirmAction(this, 'Cấp lại mật khẩu', 'Hành động này sẽ đặt lại mật khẩu của học sinh thành một mật khẩu tạm thời ngẫu nhiên và gửi qua email. Xác nhận?', '🔑');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline" style="width: 100%; color: var(--warning); border-color: rgba(251, 191, 36, 0.3);">🔑 Cấp lại mật khẩu tạm</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right Side: Course & Progress -->
+  <div class="card">
+    <h3 style="margin-bottom: 20px; font-weight: 700; color: #fff;">Khóa học đã đăng ký</h3>
+    
+    {% if enrollments %}
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+      {% for e in enrollments %}
+      <div style="padding: 16px; border: 1px solid var(--card-border); border-radius: 12px; background: rgba(255,255,255,0.02); display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <h4 style="font-size: 1.05rem; font-weight: 700; color: #fff;">{{ e.course_title }}</h4>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Ghi danh ngày: {{ e.enrolled_at.strftime('%d/%m/%Y') }}</span>
+          </div>
+          <div>
+            {% if e.status == 'active' %}
+              <span class="badge" style="background: rgba(34, 197, 94, 0.1); color: var(--success);">Đang học</span>
+            {% elif e.status == 'completed' %}
+              <span class="badge" style="background: rgba(99, 102, 241, 0.1); color: var(--primary);">Hoàn thành</span>
+            {% elif e.status == 'pending_payment' %}
+              <span class="badge" style="background: rgba(251, 191, 36, 0.1); color: var(--warning);">Chờ đóng tiền</span>
+            {% else %}
+              <span class="badge" style="background: rgba(255, 255, 255, 0.05); color: var(--text-muted);">{{ e.status }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="progress-container" style="margin: 4px 0;">
+          <div class="progress-label">
+            <span>Tiến độ học tập: {{ e.completed_lessons }}/{{ e.total_lessons }} bài</span>
+            <span>{{ e.progress }}%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ e.progress }}%;"></div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px; margin-top: 4px;">
+          <span style="font-weight: 600; font-size: 0.9rem;">Học phí: <span style="color: var(--primary);">{{ "{:,}".format(e.price) }} VND</span></span>
+          
+          {% if e.cert_code %}
+            <a href="{{ url_for('student.public_certificate', cert_code=e.cert_code) }}" target="_blank" class="btn btn-outline btn-sm" style="color: var(--success); border-color: rgba(16, 185, 129, 0.3);">🎓 Xem Chứng chỉ</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-box" style="text-align: center; padding: 40px; color: var(--text-muted);">
+      Học viên này chưa đăng ký khóa học nào.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% else %}
+<!-- 🔍 TRA CỨU HỌC VIÊN -->
+<header class="top-header">
+  <div>
+    <h1>Tra cứu thông tin Học viên</h1>
+    <p>Tìm kiếm nhanh tài khoản, số điện thoại, trạng thái và tiến độ học tập.</p>
+  </div>
+</header>
+
+<div class="card" style="margin-bottom: 24px;">
+  <form method="GET" action="{{ url_for('le_tan.list_students') }}" style="display: flex; gap: 12px;">
+    <input type="text" name="q" value="{{ query or '' }}" placeholder="Nhập Email hoặc Số điện thoại học viên..." style="flex: 1;">
+    <button type="submit" class="btn btn-primary">🔍 Tìm kiếm</button>
+    {% if query %}
+      <a href="{{ url_for('le_tan.list_students') }}" class="btn btn-outline">Làm mới</a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="card">
+  <h3 style="margin-bottom: 20px; font-weight: 700;">Kết quả tra cứu</h3>
+  
+  {% if students %}
+  <div style="overflow-x: auto;">
+    <table class="table" style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr style="text-align: left; border-bottom: 1px solid var(--card-border);">
+          <th style="padding: 12px;">Học viên</th>
+          <th style="padding: 12px;">Số điện thoại</th>
+          <th style="padding: 12px;">Ngày tham gia</th>
+          <th style="padding: 12px;">Trạng thái</th>
+          <th style="padding: 12px;">Hành động</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in students %}
+        <tr style="border-bottom: 1px solid var(--card-border);">
+          <td style="padding: 12px;">
+            <div style="font-weight: 600; color: #fff;">{{ s.email }}</div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">ID: {{ s.id }}</span>
+          </td>
+          <td style="padding: 12px; color: var(--text-muted);">{{ s.phone or 'Chưa cập nhật' }}</td>
+          <td style="padding: 12px; color: var(--text-muted);">{{ s.created_at.strftime('%d/%m/%Y') }}</td>
+          <td style="padding: 12px;">
+            {% if s.is_active %}
+              <span class="badge" style="background: rgba(34, 197, 94, 0.1); color: var(--success);">Kích hoạt</span>
+            {% else %}
+              <span class="badge" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);">Vô hiệu hóa</span>
+            {% endif %}
+          </td>
+          <td style="padding: 12px;">
+            <a href="{{ url_for('le_tan.student_detail', user_id=s.id) }}" class="btn btn-outline btn-sm">Xem hồ sơ chi tiết</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-box" style="text-align: center; padding: 40px; color: var(--text-muted);">
+    Không tìm thấy thông tin học viên phù hợp. Hãy thử lại với từ khóa khác.
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

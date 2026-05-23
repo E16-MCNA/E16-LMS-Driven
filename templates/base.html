@@ -76,25 +76,31 @@
             <a href="{{ url_for('hoc_vu.dashboard') }}" class="nav-item {% if request.endpoint == 'hoc_vu.dashboard' %}active{% endif %}">
               <span>Dashboard</span>
             </a>
-            <a href="{{ url_for('hoc_vu.create_account') }}" class="nav-item {% if request.endpoint == 'hoc_vu.create_account' %}active{% endif %}">
-              <span>Tạo tài khoản</span>
-            </a>
-            <a href="{{ url_for('hoc_vu.import_accounts_view') }}" class="nav-item {% if request.endpoint in ('hoc_vu.import_accounts_view', 'hoc_vu.import_accounts') %}active{% endif %}">
-              <span>Import hàng loạt</span>
-            </a>
-            <a href="{{ url_for('hoc_vu.list_accounts') }}" class="nav-item {% if request.endpoint == 'hoc_vu.list_accounts' %}active{% endif %}">
-              <span>Tài khoản đã tạo</span>
-            </a>
             <a href="{{ url_for('hoc_vu.pending_courses') }}" class="nav-item {% if request.endpoint == 'hoc_vu.pending_courses' %}active{% endif %}">
               <span>Duyệt khoá học</span>
             </a>
           {% elif current_user.role == 'le_tan' %}
-            <a href="{{ url_for('analytics.dashboard') }}" class="nav-item {% if request.blueprint == 'analytics' %}active{% endif %}">
-              <span>Dashboard</span>
+            <a href="{{ url_for('le_tan.dashboard') }}" class="nav-item {% if request.endpoint == 'le_tan.dashboard' %}active{% endif %}">
+              <span>Dashboard Lễ tân</span>
+            </a>
+            <a href="{{ url_for('le_tan.list_students') }}" class="nav-item {% if request.endpoint in ('le_tan.list_students', 'le_tan.student_detail') %}active{% endif %}">
+              <span>Tra cứu học viên</span>
+            </a>
+            <a href="{{ url_for('le_tan.create_student') }}" class="nav-item {% if request.endpoint == 'le_tan.create_student' %}active{% endif %}">
+              <span>Tạo học viên mới</span>
+            </a>
+            <a href="{{ url_for('le_tan.enroll_student') }}" class="nav-item {% if request.endpoint == 'le_tan.enroll_student' %}active{% endif %}">
+              <span>Đăng ký học tại quầy</span>
             </a>
           {% elif current_user.role == 'ke_toan' %}
-            <a href="{{ url_for('analytics.dashboard') }}" class="nav-item {% if request.blueprint == 'analytics' %}active{% endif %}">
-              <span>Dashboard</span>
+            <a href="{{ url_for('ke_toan.dashboard') }}" class="nav-item {% if request.endpoint == 'ke_toan.dashboard' %}active{% endif %}">
+              <span>Dashboard tài chính</span>
+            </a>
+            <a href="{{ url_for('ke_toan.reconciliation') }}" class="nav-item {% if request.endpoint == 'ke_toan.reconciliation' %}active{% endif %}">
+              <span>Đối soát thanh toán</span>
+            </a>
+            <a href="{{ url_for('ke_toan.revenue') }}" class="nav-item {% if request.endpoint == 'ke_toan.revenue' %}active{% endif %}">
+              <span>Sổ thu chi chi tiết</span>
             </a>
           {% endif %}
           
@@ -194,7 +200,7 @@
 
         okBtn.addEventListener('click', function() {
           if (pendingForm) {
-            pendingForm.removeAttribute('data-confirm');
+            pendingForm.setAttribute('data-confirmed', 'true');
             pendingForm.requestSubmit ? pendingForm.requestSubmit() : pendingForm.submit();
           }
           hideModal();
@@ -202,6 +208,10 @@
 
         // Global confirmAction function for forms
         window.confirmAction = function(form, title, message, icon) {
+          if (form.getAttribute('data-confirmed') === 'true') {
+            form.removeAttribute('data-confirmed');
+            return true;
+          }
           pendingForm = form;
           showModal(title, message, icon);
           return false; // prevent default form submission

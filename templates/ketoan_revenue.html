@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="top-header">
+  <div>
+    <h1>Sổ Chi Tiết Thu Chi</h1>
+    <p>Nhật ký ghi nhận dòng tiền thành công, lịch sử đóng học phí và xử lý hoàn trả học phí.</p>
+  </div>
+</header>
+
+<div class="card" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+  <div>
+    <div style="font-size: 0.85rem; color: var(--text-muted);">Thống kê tổng quan sổ cái</div>
+    <h2 style="font-weight: 800; color: #fff;">{{ sales|length }} giao dịch thành công</h2>
+  </div>
+  <div>
+    <a href="{{ url_for('ke_toan.export_revenue') }}" class="btn btn-primary" style="background: var(--success); box-shadow: 0 4px 14px rgba(16, 185, 129, 0.2);">
+      📥 Xuất file báo cáo (.CSV)
+    </a>
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin-bottom: 20px; font-weight: 700;">📓 Nhật ký doanh thu hệ thống</h3>
+  {% if sales %}
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; margin-top: 0;">
+        <thead>
+          <tr style="text-align: left; border-bottom: 1px solid var(--card-border);">
+            <th style="padding: 12px 8px; font-size: 0.75rem;">Mã Ghi Danh</th>
+            <th style="padding: 12px 8px; font-size: 0.75rem;">Thời gian đóng</th>
+            <th style="padding: 12px 8px; font-size: 0.75rem;">Học viên</th>
+            <th style="padding: 12px 8px; font-size: 0.75rem;">Khóa học</th>
+            <th style="padding: 12px 8px; text-align: right; font-size: 0.75rem;">Số tiền đóng</th>
+            <th style="padding: 12px 8px; text-align: center; font-size: 0.75rem;">Trạng thái học</th>
+            <th style="padding: 12px 8px; text-align: center; font-size: 0.75rem;">Quản lý dòng tiền</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in sales %}
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+            <td style="padding: 16px 8px; font-family: monospace; font-size: 0.8rem; color: var(--text-muted);">
+              {{ s.id }}
+            </td>
+            <td style="padding: 16px 8px; font-size: 0.85rem; color: var(--text-muted);">
+              {{ s.enrolled_at.strftime('%d/%m/%Y %H:%M:%S') if s.enrolled_at else 'N/A' }}
+            </td>
+            <td style="padding: 16px 8px; font-size: 0.85rem; font-weight: 600; color: #fff;">
+              {{ s.user.email if s.user else 'Học viên ẩn' }}
+            </td>
+            <td style="padding: 16px 8px; font-size: 0.85rem; color: var(--text-main);">
+              {{ s.course.title if s.course else 'Khóa học ẩn' }}
+            </td>
+            <td style="padding: 16px 8px; text-align: right; font-size: 0.85rem; font-weight: 700; color: var(--success);">
+              {{ "{:,.0f}".format(s.course.price) if s.course else '0' }}đ
+            </td>
+            <td style="padding: 16px 8px; text-align: center;">
+              {% if s.status == 'active' %}
+                <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: var(--success);">Đang học</span>
+              {% elif s.status == 'completed' %}
+                <span class="badge" style="background: rgba(99, 102, 241, 0.1); color: var(--primary);">Hoàn thành</span>
+              {% else %}
+                <span class="badge" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);">{{ s.status }}</span>
+              {% endif %}
+            </td>
+            <td style="padding: 16px 8px; text-align: center;">
+              <form action="{{ url_for('ke_toan.refund_enrollment', enroll_id=s.id) }}" method="POST" style="display: inline;" onsubmit="return confirmAction(this, 'Hoàn trả học phí', 'Xác nhận hoàn học phí {{ '{:,.0f}'.format(s.course.price) if s.course else '0' }}đ cho học viên {{ s.user.email if s.user else "" }}? Hành động này sẽ lập tức thu hồi quyền truy cập khóa học {{ s.course.title if s.course else "" }}!', '⚠️');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-danger btn-sm" style="padding: 4px 10px; font-size: 0.8rem; font-weight: 500;">
+                  🔄 Hoàn học phí
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div style="text-align: center; padding: 60px; color: var(--text-muted);">
+      <div style="font-size: 3rem; margin-bottom: 8px;">📓</div>
+      Chưa ghi nhận giao dịch thành công nào trong hệ thống.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

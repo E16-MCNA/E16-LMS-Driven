@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="top-header">
+  <div>
+    <h1>Đối Soát & Phê Duyệt Thanh Toán</h1>
+    <p>Đối chiếu và phê duyệt các giao dịch chờ thanh toán chuyển khoản QR / ngân hàng.</p>
+  </div>
+</header>
+
+<div class="card" style="margin-bottom: 24px; background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.2);">
+  <div style="display: flex; gap: 16px; align-items: flex-start;">
+    <div style="font-size: 1.5rem;">💡</div>
+    <div>
+      <h4 style="color: var(--warning); margin-bottom: 6px; font-weight: 700;">Hướng dẫn đối soát nhanh</h4>
+      <ul style="padding-left: 20px; font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;">
+        <li>Vui lòng kiểm tra ứng dụng ngân hàng hoặc bảng sao kê tài khoản ngân hàng liên kết.</li>
+        <li>Tìm kiếm giao dịch khớp với số tiền và email của học viên hiển thị bên dưới.</li>
+        <li>Nhấn <strong>Phê duyệt</strong> để kích hoạt ngay quyền học tập cho học viên.</li>
+        <li>Nếu giao dịch không hợp lệ hoặc bị huỷ, hãy nhấn <strong>Từ chối</strong> để xoá yêu cầu chờ.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin-bottom: 20px; font-weight: 700;">⏳ Danh sách yêu cầu chờ đối soát ({{ pending_list|length }})</h3>
+  {% if pending_list %}
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; margin-top: 0;">
+        <thead>
+          <tr style="text-align: left; border-bottom: 1px solid var(--card-border);">
+            <th style="padding: 12px 8px; font-size: 0.75rem;">Thời gian yêu cầu</th>
+            <th style="padding: 12px 8px; font-size: 0.75rem;">Thông tin học viên</th>
+            <th style="padding: 12px 8px; font-size: 0.75rem;">Khóa học đăng ký</th>
+            <th style="padding: 12px 8px; text-align: right; font-size: 0.75rem;">Học phí</th>
+            <th style="padding: 12px 8px; text-align: center; font-size: 0.75rem;">Mã thanh toán gợi ý</th>
+            <th style="padding: 12px 8px; text-align: center; font-size: 0.75rem;">Hành động</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in pending_list %}
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+            <td style="padding: 16px 8px; font-size: 0.85rem; color: var(--text-muted);">
+              {{ e.enrolled_at.strftime('%d/%m/%Y %H:%M') if e.enrolled_at else 'N/A' }}
+            </td>
+            <td style="padding: 16px 8px; font-size: 0.85rem;">
+              <div style="font-weight: 600; color: #fff;">{{ e.user.email if e.user else 'Học viên ẩn' }}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">SĐT: {{ e.user.phone or 'Chưa cập nhật' }}</div>
+            </td>
+            <td style="padding: 16px 8px; font-size: 0.85rem; color: var(--text-main); font-weight: 500;">
+              {{ e.course.title if e.course else 'Khóa học ẩn' }}
+            </td>
+            <td style="padding: 16px 8px; text-align: right; font-size: 0.85rem; font-weight: 700; color: var(--success);">
+              {{ "{:,.0f}".format(e.course.price) if e.course else '0' }}đ
+            </td>
+            <td style="padding: 16px 8px; text-align: center; font-size: 0.8rem; font-family: monospace; color: var(--primary);">
+              E16PAY{{ e.id[:6].upper() }}
+            </td>
+            <td style="padding: 16px 8px; text-align: center;">
+              <div style="display: inline-flex; gap: 8px;">
+                <form action="{{ url_for('ke_toan.approve_payment', enroll_id=e.id) }}" method="POST" style="display: inline;" onsubmit="return confirmAction(this, 'Phê duyệt thanh toán', 'Xác nhận phê duyệt đóng tiền cho học viên {{ e.user.email if e.user else "" }} học khóa {{ e.course.title if e.course else "" }}?', '✔️');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-primary btn-sm" style="background: var(--success); box-shadow: none;">Phê duyệt</button>
+                </form>
+                <form action="{{ url_for('ke_toan.reject_payment', enroll_id=e.id) }}" method="POST" style="display: inline;" onsubmit="return confirmAction(this, 'Từ chối giao dịch', 'Từ chối thanh toán và hủy yêu cầu ghi danh của học viên {{ e.user.email if e.user else "" }} học khóa {{ e.course.title if e.course else "" }}?', '❌');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-danger btn-sm" style="box-shadow: none;">Từ chối</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div style="text-align: center; padding: 60px 20px; color: var(--text-muted);">
+      <div style="font-size: 3rem; margin-bottom: 12px; color: var(--success);">🎉</div>
+      <h4 style="color: #fff; margin-bottom: 8px; font-weight: 600;">Tuyệt vời! Không có giao dịch chờ</h4>
+      <p style="font-size: 0.85rem;">Tất cả các giao dịch và yêu cầu đóng tiền đã được xử lý hoặc đối soát thành công.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
