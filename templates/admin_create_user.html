@@ -1,69 +1,88 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block content %}
-<div class="card" style="max-width: 600px; margin: 40px auto; padding: 32px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);">
-  <header style="margin-bottom: 28px; text-align: center;">
-    <h1 style="font-size: 1.8rem; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">âž• Táº¡o ngÆ°á»i dÃ¹ng má»›i</h1>
-    <p style="color: var(--text-muted); font-size: 0.95rem;">Cáº¥p tÃ i khoáº£n má»›i cho nhÃ¢n viÃªn hoáº·c há»c viÃªn trong há»‡ thá»‘ng.</p>
-  </header>
+<div class="card" style="max-width: 650px; margin: 40px auto; padding: 32px; border: 1px solid var(--card-border); background: var(--card); backdrop-filter: blur(10px); border-radius: 16px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);">
+  
+  <div style="margin-bottom: 28px; text-align: left;">
+    <h1 style="font-size: 1.8rem; font-weight: 700; color: var(--text-main); margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
+      ➕ Tạo người dùng mới
+    </h1>
+    <p style="color: var(--text-muted); font-size: 0.95rem; margin: 0; line-height: 1.5;">
+      Cấp tài khoản mới cho nhân viên hoặc học viên trong hệ thống.
+    </p>
+  </div>
 
-  <form action="{{ url_for('admin.create_user') }}" method="POST" id="create-user-form">
+  <form action="{{ url_for('admin.create_user') }}" method="POST" id="create-user-form" style="display: flex; flex-direction: column; gap: 20px;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-    <div style="margin-bottom: 20px;">
-      <label for="email" style="display: block; font-weight: 600; margin-bottom: 8px; color: var(--text-main);">Email <span style="color: var(--danger);">*</span></label>
-      <input type="email" id="email" name="email" required placeholder="nhap.email@e16.edu.vn"
-             style="width: 100%; padding: 12px; border: 1px solid var(--card-border); border-radius: 8px; background: var(--card-bg); color: var(--text-main); font-size: 1rem; transition: border-color 0.2s;">
+    
+    <div class="form-group" style="display: flex; flex-direction: column; gap: 8px;">
+      <label for="email" style="font-weight: 600; color: var(--text-main); font-size: 0.9rem;">
+        Email <span style="color: var(--danger);">*</span>
+      </label>
+      <input type="email" id="email" name="email" required placeholder="nhap.email@e16.edu.vn" 
+             style="width: 100%; padding: 12px 16px; background: rgba(3, 6, 20, 0.6); border: 1px solid var(--card-border); border-radius: 8px; color: var(--text-main); font-size: 0.95rem; transition: var(--transition);">
     </div>
 
-    <div style="margin-bottom: 20px;">
-      <label for="phone" style="display: block; font-weight: 600; margin-bottom: 8px; color: var(--text-main);">Sá»‘ Ä‘iá»‡n thoáº¡i</label>
-      <input type="text" id="phone" name="phone" placeholder="VÃ­ dá»¥: 0912345678"
-             style="width: 100%; padding: 12px; border: 1px solid var(--card-border); border-radius: 8px; background: var(--card-bg); color: var(--text-main); font-size: 1rem; transition: border-color 0.2s;">
+    <div class="form-group" style="display: flex; flex-direction: column; gap: 8px;">
+      <label for="phone" style="font-weight: 600; color: var(--text-main); font-size: 0.9rem;">
+        Số điện thoại
+      </label>
+      <input type="tel" id="phone" name="phone" placeholder="Ví dụ: 0912345678" 
+             style="width: 100%; padding: 12px 16px; background: rgba(3, 6, 20, 0.6); border: 1px solid var(--card-border); border-radius: 8px; color: var(--text-main); font-size: 0.95rem; transition: var(--transition);">
     </div>
 
-    <div style="margin-bottom: 24px;">
-      <label for="role" style="display: block; font-weight: 600; margin-bottom: 8px; color: var(--text-main);">Vai trÃ² há»‡ thá»‘ng <span style="color: var(--danger);">*</span></label>
-      <select id="role" name="role" required onchange="toggleCourseSelection()"
-              style="width: 100%; padding: 12px; border: 1px solid var(--card-border); border-radius: 8px; background: var(--card-bg); color: var(--text-main); font-size: 1rem; cursor: pointer;">
-        <option value="student" selected style="color: #0f172a; background: #ffffff;">Student (Há»c viÃªn)</option>
-        <option value="teacher" style="color: #0f172a; background: #ffffff;">Teacher (GiÃ¡o viÃªn)</option>
-        <option value="hoc_vu" style="color: #0f172a; background: #ffffff;">Há»c vá»¥ (Academic Affairs)</option>
-        <option value="le_tan" style="color: #0f172a; background: #ffffff;">Lá»… tÃ¢n (Receptionist)</option>
-        <option value="ke_toan" style="color: #0f172a; background: #ffffff;">Káº¿ toÃ¡n (Accountant)</option>
-        <option value="admin" style="color: #0f172a; background: #ffffff;">Admin (Quáº£n trá»‹ viÃªn)</option>
+    <div class="form-group" style="display: flex; flex-direction: column; gap: 8px;">
+      <label for="role" style="font-weight: 600; color: var(--text-main); font-size: 0.9rem;">
+        Vai trò hệ thống <span style="color: var(--danger);">*</span>
+      </label>
+      <select id="role" name="role" required onchange="toggleCourseSelection()" 
+              style="width: 100%; padding: 12px 16px; background: rgba(3, 6, 20, 0.6); border: 1px solid var(--card-border); border-radius: 8px; color: var(--text-main); font-size: 0.95rem; transition: var(--transition); cursor: pointer;">
+        <option value="student" selected style="color: #0f172a; background: #ffffff;">Student (Học viên)</option>
+        <option value="teacher" style="color: #0f172a; background: #ffffff;">Teacher (Giảng viên)</option>
+        <option value="hoc_vu" style="color: #0f172a; background: #ffffff;">Học vụ (Academic Affairs)</option>
+        <option value="le_tan" style="color: #0f172a; background: #ffffff;">Lễ tân (Receptionist)</option>
+        <option value="ke_toan" style="color: #0f172a; background: #ffffff;">Kế toán (Accountant)</option>
+        <option value="admin" style="color: #0f172a; background: #ffffff;">Admin (Quản trị viên)</option>
       </select>
     </div>
 
-    <div id="course-selection-container" style="margin-bottom: 24px; padding: 16px; border: 1px dashed var(--primary); border-radius: 8px; background: rgba(59, 130, 246, 0.03); transition: all 0.3s ease;">
-      <label for="course_id" style="display: block; font-weight: 600; margin-bottom: 8px; color: var(--text-main);">ÄÄƒng kÃ½ khÃ³a há»c ngay</label>
-      <select id="course_id" name="course_id"
-              style="width: 100%; padding: 12px; border: 1px solid var(--card-border); border-radius: 8px; background: var(--card-bg); color: var(--text-main); font-size: 1rem; cursor: pointer;">
-        <option value="" style="color: #0f172a; background: #ffffff;">-- KhÃ´ng Ä‘Äƒng kÃ½ ngay --</option>
+    <div id="course-selection-container" style="margin-bottom: 8px; padding: 16px; border: 1px dashed var(--primary); border-radius: 8px; background: rgba(99, 102, 241, 0.03); transition: all 0.3s ease;">
+      <label for="course_id" style="display: block; font-weight: 600; margin-bottom: 8px; color: var(--text-main);">Đăng ký khóa học ngay</label>
+      <select id="course_id" name="course_id" 
+              style="width: 100%; padding: 12px 16px; background: rgba(3, 6, 20, 0.6); border: 1px solid var(--card-border); border-radius: 8px; color: var(--text-main); font-size: 0.95rem; cursor: pointer;">
+        <option value="" style="color: #0f172a; background: #ffffff;">-- Không đăng ký ngay --</option>
         {% for course in courses %}
           <option value="{{ course.id }}" style="color: #0f172a; background: #ffffff;">{{ course.title }}</option>
         {% endfor %}
       </select>
-      <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 8px; margin-bottom: 0;">Lá»±a chá»n khÃ³a há»c nÃ y sáº½ tá»± Ä‘á»™ng ghi danh (enroll) há»c sinh má»›i táº¡o vÃ o khÃ³a há»c.</p>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 8px; margin-bottom: 0; line-height: 1.4;">
+        Lựa chọn khóa học này sẽ tự động ghi danh (enroll) học sinh mới tạo vào khóa học.
+      </p>
     </div>
 
-    <div style="display: flex; gap: 12px; margin-top: 32px;">
-      <a href="{{ url_for('admin.list_users') }}" class="btn btn-outline" style="flex: 1; text-align: center; padding: 12px;">Há»§y bá»</a>
-      <button type="submit" class="btn btn-primary" style="flex: 2; padding: 12px;">âœ”ï¸ XÃ¡c nháº­n táº¡o tÃ i khoáº£n</button>
+    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px; padding-top: 20px; border-top: 1px solid var(--card-border);">
+      <a href="{{ url_for('admin.list_users') }}" 
+         class="btn btn-outline" style="padding: 10px 24px; border-radius: 8px; font-weight: 600; transition: var(--transition); text-decoration: none; text-align: center; line-height: 1.5; flex: 1;">
+        Hủy bỏ
+      </a>
+      <button type="submit" class="btn btn-primary" 
+              style="padding: 10px 24px; border-radius: 8px; font-weight: 600; transition: var(--transition); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); flex: 2;">
+        ✔ Xác nhận tạo tài khoản
+      </button>
     </div>
   </form>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
   function toggleCourseSelection() {
     const roleSelect = document.getElementById('role');
     const courseContainer = document.getElementById('course-selection-container');
     const courseSelect = document.getElementById('course_id');
 
-    if (roleSelect.value === 'student') {
+    if (roleSelect && roleSelect.value === 'student') {
       courseContainer.style.display = 'block';
-    } else {
+    } else if (courseContainer) {
       courseContainer.style.display = 'none';
-      courseSelect.value = ''; // Reset selection
+      if (courseSelect) courseSelect.value = ''; // Reset selection
     }
   }
 

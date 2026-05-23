@@ -87,6 +87,7 @@ def dashboard():
 
 
 
+
 # ── Course approval ──────────────────────────────────────
 
 @bp.route("/courses/pending")

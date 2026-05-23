@@ -8,6 +8,8 @@
   </div>
 </header>
 
+{% include "course_subnav.html" %}
+
 <div class="card" style="max-width: 600px; margin: 0 auto;">
   <form action="{{ url_for('teacher.edit_course', course_id=course.id) }}" method="post" class="form-group">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
