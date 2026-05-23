@@ -97,17 +97,20 @@
               <span>Dashboard</span>
             </a>
           {% endif %}
-        </nav>
-        <div class="sidebar-footer">
-          <div class="user-profile">
-            <a href="{{ url_for('communication.list_notifications') }}" style="position: relative; margin-right: 20px; color: var(--text-main); text-decoration: none;">
-              <span style="font-size: 1.2rem;">🔔</span>
+          
+          <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--card-border);">
+            <a href="{{ url_for('communication.list_notifications') }}" class="nav-item {% if request.endpoint == 'communication.list_notifications' %}active{% endif %}">
+              <span>🔔 Thông báo</span>
               {% if unread_notifs_count > 0 %}
-                <span class="badge" style="position: absolute; top: -8px; right: -8px; background: var(--danger); color: white; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; border: 2px solid white;">
+                <span class="badge" style="background: var(--danger); color: white; border-radius: 12px; padding: 2px 8px; font-size: 0.75rem; font-weight: bold; margin-left: auto;">
                   {{ unread_notifs_count }}
                 </span>
               {% endif %}
             </a>
+          </div>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="user-profile">
             <div class="user-avatar">{{ current_user.email[0].upper() }}</div>
             <div class="user-info">
               <div class="user-name">{{ current_user.email.split('@')[0] }}</div>

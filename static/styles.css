@@ -5,6 +5,7 @@
   --card: rgba(16, 22, 50, 0.6);
   --card-border: rgba(143, 164, 255, 0.15);
   --text: #f0f3ff;
+  --text-main: #f0f3ff;
   --text-muted: #94a3b8;
   --primary: #6366f1;
   --primary-hover: #818cf8;
@@ -711,6 +712,52 @@ input:focus, select:focus, textarea:focus {
 @keyframes pulseGlow {
   0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--success); }
   50% { opacity: 0.6; box-shadow: 0 0 16px var(--success); }
+}
+
+/* Course Sub-navigation Tabs */
+.course-nav-container {
+  margin-top: -10px;
+  margin-bottom: 30px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.course-nav-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 0px;
+  scroll-behavior: smooth;
+}
+
+.course-nav-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.course-nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.95rem;
+  border-radius: 8px 8px 0 0;
+  border-bottom: 3px solid transparent;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.course-nav-tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.course-nav-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  background: rgba(99, 102, 241, 0.05);
+  font-weight: 600;
 }
 
 /* Responsive */

@@ -121,8 +121,9 @@ def create_account():
             flash("Email không hợp lệ.", "error")
             return redirect(url_for("hoc_vu.create_account"))
 
-        if role not in CREATABLE_ROLES:
-            flash(f"Role '{role}' không hợp lệ. Chỉ được tạo: {', '.join(sorted(CREATABLE_ROLES))}.", "error")
+        allowed_roles = VALID_ROLES if current_user.role == "admin" else CREATABLE_ROLES
+        if role not in allowed_roles:
+            flash(f"Role '{role}' không hợp lệ. Chỉ được tạo: {', '.join(sorted(allowed_roles))}.", "error")
             return redirect(url_for("hoc_vu.create_account"))
 
         if db.session.query(User).filter_by(email=email).first():

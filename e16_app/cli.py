@@ -154,6 +154,72 @@ def create_hoc_vu_command(email, password):
     db.session.commit()
 
 
+@click.command("create-teacher")
+@click.option("--email", prompt="Teacher email", help="Email for the teacher user.")
+@click.option(
+    "--password",
+    prompt="Teacher password",
+    hide_input=True,
+    confirmation_prompt=True,
+    help="Password for the teacher user.",
+)
+@with_appcontext
+def create_teacher_command(email, password):
+    """Create or update a Teacher user."""
+    user = db.session.query(User).filter_by(email=email).first()
+    if user:
+        user.role = "teacher"
+        user.password_hash = generate_password_hash(password)
+        user.is_active = True
+        user.must_change_password = False
+        click.echo(f"Updated existing user to teacher: {email}")
+    else:
+        user = User(
+            email=email,
+            password_hash=generate_password_hash(password),
+            role="teacher",
+            is_active=True,
+            must_change_password=False,
+        )
+        db.session.add(user)
+        click.echo(f"Created teacher user: {email}")
+
+    db.session.commit()
+
+
+@click.command("create-student")
+@click.option("--email", prompt="Student email", help="Email for the student user.")
+@click.option(
+    "--password",
+    prompt="Student password",
+    hide_input=True,
+    confirmation_prompt=True,
+    help="Password for the student user.",
+)
+@with_appcontext
+def create_student_command(email, password):
+    """Create or update a Student user."""
+    user = db.session.query(User).filter_by(email=email).first()
+    if user:
+        user.role = "student"
+        user.password_hash = generate_password_hash(password)
+        user.is_active = True
+        user.must_change_password = False
+        click.echo(f"Updated existing user to student: {email}")
+    else:
+        user = User(
+            email=email,
+            password_hash=generate_password_hash(password),
+            role="student",
+            is_active=True,
+            must_change_password=False,
+        )
+        db.session.add(user)
+        click.echo(f"Created student user: {email}")
+
+    db.session.commit()
+
+
 @click.command("auto-transition-courses")
 @with_appcontext
 def auto_transition_courses_command():
@@ -170,4 +236,6 @@ def init_app(app):
     app.cli.add_command(check_deadlines_command)
     app.cli.add_command(run_jobs_command)
     app.cli.add_command(create_hoc_vu_command)
+    app.cli.add_command(create_teacher_command)
+    app.cli.add_command(create_student_command)
     app.cli.add_command(auto_transition_courses_command)

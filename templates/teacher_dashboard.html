@@ -5,10 +5,10 @@
     <h1>Tổng quan Giảng dạy</h1>
     <p style="color: var(--text-muted);">Chào mừng trở lại, hãy xem qua tiến độ các khóa học của bạn.</p>
   </div>
-  <a href="{{ url_for('teacher.create_course') }}" class="btn btn-primary" onclick="event.preventDefault(); document.getElementById('quick-create-form').submit();">
+  <button type="button" class="btn btn-primary" onclick="document.getElementById('quick-create-form').submit();">
     <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
     Tạo khóa học nhanh
-  </a>
+  </button>
   <form id="quick-create-form" action="{{ url_for('teacher.create_course') }}" method="post" style="display: none;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="title" value="Khóa học mới">
