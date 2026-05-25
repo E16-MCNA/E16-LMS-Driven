@@ -1,0 +1,25 @@
+<div class="course-nav-container">
+  <div class="course-nav-tabs">
+    <a href="{{ url_for('teacher.manage_lessons', course_id=course.id) }}" class="course-nav-tab {% if request.endpoint in ['teacher.manage_lessons', 'teacher.edit_lesson'] %}active{% endif %}">
+      📚 Bài học
+    </a>
+    <a href="{{ url_for('teacher.course_students', course_id=course.id) }}" class="course-nav-tab {% if request.endpoint == 'teacher.course_students' %}active{% endif %}">
+      👥 Học viên
+    </a>
+    <a href="{{ url_for('teacher.manage_quizzes', course_id=course.id) }}" class="course-nav-tab {% if request.endpoint in ['teacher.manage_quizzes', 'teacher.create_quiz', 'teacher.edit_quiz'] %}active{% endif %}">
+      📝 Quizzes
+    </a>
+    <a href="{{ url_for('teacher.manage_assignments', course_id=course.id) }}" class="course-nav-tab {% if request.endpoint in ['teacher.manage_assignments', 'teacher.create_assignment', 'teacher.view_submissions'] %}active{% endif %}">
+      💼 Bài tập
+    </a>
+    <a href="{{ url_for('teacher.view_gradebook', course_id=course.id) }}" class="course-nav-tab {% if request.endpoint in ['teacher.view_gradebook', 'teacher.export_gradebook'] %}active{% endif %}">
+      📊 Bảng điểm
+    </a>
+    <a href="{{ url_for('teacher.course_analytics', course_id=course.id) }}" class="course-nav-tab {% if request.endpoint == 'teacher.course_analytics' %}active{% endif %}">
+      📈 Analytics
+    </a>
+    <a href="{{ url_for('teacher.edit_course', course_id=course.id) }}" class="course-nav-tab {% if request.endpoint == 'teacher.edit_course' %}active{% endif %}">
+      ⚙️ Cấu hình
+    </a>
+  </div>
+</div>
