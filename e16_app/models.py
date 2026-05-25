@@ -38,6 +38,9 @@ COURSE_TRANSITIONS = {
 
 class User(UserMixin, db.Model):
     __tablename__ = "users"
+    __table_args__ = (
+        db.Index("idx_users_role_created", "role", "created_at"),
+    )
     id = db.Column(db.String(36), primary_key=True, default=new_uuid)
     email = db.Column(db.String(255), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
@@ -145,6 +148,8 @@ class Enrollment(db.Model):
     __tablename__ = "enrollments"
     __table_args__ = (
         db.UniqueConstraint("user_id", "course_id", name="uq_enrollments_user_course"),
+        db.Index("idx_enrollments_status_course", "status", "course_id"),
+        db.Index("idx_enrollments_user_status", "user_id", "status"),
     )
     id = db.Column(db.String(36), primary_key=True, default=new_uuid)
     user_id = db.Column(db.String(36), db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -182,6 +187,9 @@ class LearningLog(db.Model):
 
 class Quiz(db.Model):
     __tablename__ = "quizzes"
+    __table_args__ = (
+        db.Index("idx_quizzes_course_published_due", "course_id", "is_published", "due_date"),
+    )
     id = db.Column(db.String(36), primary_key=True, default=new_uuid)
     course_id = db.Column(db.String(36), db.ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
     title = db.Column(db.String(255), nullable=False)
@@ -293,6 +301,9 @@ class QuizAnswer(db.Model):
 
 class Assignment(db.Model):
     __tablename__ = "assignments"
+    __table_args__ = (
+        db.Index("idx_assignments_course_deadline", "course_id", "deadline"),
+    )
     id = db.Column(db.String(36), primary_key=True, default=new_uuid)
     course_id = db.Column(db.String(36), db.ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
     title = db.Column(db.String(255), nullable=False)
@@ -307,6 +318,8 @@ class Submission(db.Model):
     __tablename__ = "submissions"
     __table_args__ = (
         db.UniqueConstraint("user_id", "assignment_id", name="uq_submissions_user_assignment"),
+        db.Index("idx_submissions_assignment_status", "assignment_id", "status"),
+        db.Index("idx_submissions_user_assignment_status", "user_id", "assignment_id", "status"),
     )
     id = db.Column(db.String(36), primary_key=True, default=new_uuid)
     assignment_id = db.Column(db.String(36), db.ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False, index=True)

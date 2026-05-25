@@ -23,6 +23,10 @@
   </div>
 </div>
 
+{% if course_stats %}
+  <script nonce="{{ csp_nonce() }}" src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endif %}
+
 {% for stat in course_stats %}
 <section class="card" style="margin-bottom: 32px;">
   <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
@@ -44,11 +48,11 @@
         datasets: [{
           label: 'Số lượng học viên hoàn thành',
           data: {{ stat.funnel_values|tojson }},
-          backgroundColor: 'rgba(99, 102, 241, 0.5)',
-          borderColor: '#6366f1',
+          backgroundColor: 'rgba(37, 99, 235, 0.18)',
+          borderColor: '#2563eb',
           borderWidth: 2,
           borderRadius: 8,
-          hoverBackgroundColor: 'rgba(99, 102, 241, 0.8)'
+          hoverBackgroundColor: 'rgba(37, 99, 235, 0.32)'
         }]
       },
       options: {
@@ -57,27 +61,28 @@
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: '#0f172a',
+            backgroundColor: '#111827',
             padding: 12,
-            titleFont: { size: 14, weight: 'bold' },
-            bodyFont: { size: 13 },
+            titleFont: { family: 'Plus Jakarta Sans', size: 14, weight: 'bold' },
+            bodyFont: { family: 'Plus Jakarta Sans', size: 13 },
             displayColors: false
           }
         },
         scales: {
           y: {
             beginAtZero: true,
-            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-            ticks: { color: '#94a3b8', stepSize: 1 }
+            grid: { color: '#e5e7eb' },
+            ticks: { color: '#667085', stepSize: 1 }
           },
           x: {
             grid: { display: false },
-            ticks: { color: '#94a3b8' }
+            ticks: { color: '#667085' }
           }
         }
-      });
-    </script>
-  </section>
+      }
+    });
+  </script>
+</section>
 {% endfor %}
 
 {% if course_stats|length == 0 %}

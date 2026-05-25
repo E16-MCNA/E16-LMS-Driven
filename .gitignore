@@ -10,3 +10,4 @@ scratch/
 .pytest_cache/
 backups/
 learning_logs_export.csv
+.vercel

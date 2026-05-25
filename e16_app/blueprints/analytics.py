@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 from datetime import timedelta
 import os
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, url_for
 from flask_login import login_required
-from sqlalchemy import func
+from sqlalchemy import case, func
 
 from ..auth_utils import role_required
 from ..extensions import db
@@ -24,16 +24,42 @@ def _export_max_rows() -> int:
 def dashboard():
     days = int(request.args.get("range", 30))
     now = utcnow()
+
+    user_stats = db.session.query(
+        func.count(User.id),
+        func.sum(case((User.role == "teacher", 1), else_=0)),
+        func.sum(case((User.role == "student", 1), else_=0)),
+    ).one()
+    total_courses = db.session.query(func.count(Course.id)).filter(
+        Course.status == "published",
+        Course.is_deleted == False,
+    ).scalar() or 0
+    total_enrollments = db.session.query(func.count(Enrollment.id)).scalar() or 0
+    today_logs = db.session.query(func.count(LearningLog.log_id)).filter(
+        LearningLog.timestamp >= now.replace(hour=0, minute=0, second=0, microsecond=0)
+    ).scalar() or 0
+
+    return render_template(
+        "admin_analytics.html",
+        range=days,
+        total_users=user_stats[0] or 0,
+        total_teachers=user_stats[1] or 0,
+        total_students=user_stats[2] or 0,
+        total_courses=total_courses,
+        total_enrollments=total_enrollments,
+        today_logs=today_logs,
+        chart_data_url=url_for("analytics.dashboard_data", range=days),
+    )
+
+
+@bp.get("/data")
+@login_required
+@role_required("admin", "hoc_vu", "le_tan", "ke_toan")
+def dashboard_data():
+    days = int(request.args.get("range", 30))
+    now = utcnow()
     start_date = now - timedelta(days=days)
-    
-    # Summary Stats
-    total_users = db.session.query(User).count()
-    total_teachers = db.session.query(User).filter_by(role="teacher").count()
-    total_students = db.session.query(User).filter_by(role="student").count()
-    total_courses = db.session.query(Course).filter_by(status="published", is_deleted=False).count()
-    total_enrollments = db.session.query(Enrollment).count()
-    today_logs = db.session.query(LearningLog).filter(LearningLog.timestamp >= now.replace(hour=0, minute=0, second=0, microsecond=0)).count()
-    
+
     # Growth Data (Line Chart)
     user_growth_rows = db.session.query(
         func.date(User.created_at).label('date'),
@@ -69,21 +95,13 @@ def dashboard():
         func.count(Course.id).label('count')
     ).filter(Course.status == "published", Course.is_deleted == False, Course.level != "").group_by(Course.level).all()
     level_dist = [{"level": r[0], "count": r[1]} for r in level_dist_rows]
-    
-    return render_template(
-        "admin_analytics.html",
-        range=days,
-        total_users=total_users,
-        total_teachers=total_teachers,
-        total_students=total_students,
-        total_courses=total_courses,
-        total_enrollments=total_enrollments,
-        today_logs=today_logs,
-        user_growth=user_growth,
-        enroll_trend=enroll_trend,
-        top_courses=top_courses,
-        level_dist=level_dist
-    )
+
+    return jsonify({
+        "user_growth": user_growth,
+        "enroll_trend": enroll_trend,
+        "top_courses": top_courses,
+        "level_dist": level_dist,
+    })
 
 @bp.route("/export")
 @login_required

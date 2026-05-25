@@ -72,7 +72,6 @@ def oauth_authorize(name):
     login_user(user)
     from ..services.audit import log_action
     log_action("login_success", "User", user.id, {"email": email, "method": f"oauth_{name}"})
-    logger.log(f"login_oauth_{name}", user_id=user.id, user_email=user.email, metadata={"method": name})
     flash(f"Chào mừng {email}!", "success")
 
     # If user still needs to change password, redirect there
@@ -130,7 +129,6 @@ def login():
         login_user(user)
         from ..services.audit import log_action
         log_action("login_success", "User", user.id, {"email": email, "method": "email"})
-        logger.log("login", user_id=user.id, user_email=user.email, metadata={"method": "email"})
         return redirect(url_for("auth.home"))
     return render_template("login.html")
 

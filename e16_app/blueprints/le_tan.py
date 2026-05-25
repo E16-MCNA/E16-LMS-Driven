@@ -8,6 +8,8 @@ import random
 import string
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
+from sqlalchemy import case, func
+from sqlalchemy.orm import joinedload
 from werkzeug.security import generate_password_hash
 from ..auth_utils import role_required
 from ..extensions import db
@@ -54,13 +56,18 @@ def _send_welcome_email(email: str, temp_password: str, role: str):
 @login_required
 @role_required("le_tan", "admin")
 def dashboard():
-    # Show active students, active courses and count of registrations
-    total_students = db.session.query(User).filter_by(role="student").count()
-    active_courses = db.session.query(Course).filter(
+    student_stats = db.session.query(
+        func.count(User.id),
+        func.sum(case((User.is_active == True, 1), else_=0)),
+    ).filter(User.role == "student").one()
+    active_courses = db.session.query(func.count(Course.id)).filter(
         Course.status.in_(["published", "running"]),
         Course.is_deleted == False
-    ).count()
-    total_enrollments = db.session.query(Enrollment).count()
+    ).scalar() or 0
+    enrollment_stats = db.session.query(
+        func.count(Enrollment.id),
+        func.sum(case((Enrollment.status == "pending_payment", 1), else_=0)),
+    ).one()
 
     # Recent 5 students created or registered
     recent_students = (
@@ -70,13 +77,24 @@ def dashboard():
         .limit(5)
         .all()
     )
+    recent_enrollments = (
+        db.session.query(Enrollment)
+        .options(joinedload(Enrollment.user), joinedload(Enrollment.course))
+        .filter(Enrollment.status.in_(["active", "completed", "pending_payment"]))
+        .order_by(Enrollment.enrolled_at.desc())
+        .limit(5)
+        .all()
+    )
 
     return render_template(
         "letan_dashboard.html",
-        total_students=total_students,
+        total_students=student_stats[0] or 0,
+        active_students=student_stats[1] or 0,
         active_courses=active_courses,
-        total_enrollments=total_enrollments,
-        recent_students=recent_students
+        total_enrollments=enrollment_stats[0] or 0,
+        pending_payments=enrollment_stats[1] or 0,
+        recent_students=recent_students,
+        recent_enrollments=recent_enrollments,
     )
 
 

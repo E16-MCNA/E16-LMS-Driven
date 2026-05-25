@@ -3,159 +3,100 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="turbo-cache-control" content="no-preview" />
     <title>E16 LMS</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
-    <script nonce="{{ csp_nonce() }}" src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" data-turbo-track="reload" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" data-turbo-track="reload" />
+    <script nonce="{{ csp_nonce() }}" src="https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.12/dist/turbo.es2017-umd.js" defer></script>
+    <script src="{{ url_for('static', filename='app_shell.js') }}" defer data-turbo-track="reload"></script>
+    {% block head_extra %}{% endblock %}
   </head>
   <body>
-    <div class="bg-orb orb-1"></div>
-    <div class="bg-orb orb-2"></div>
-
     <div class="app-container">
       {% if current_user.is_authenticated %}
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-          <a href="{{ url_for('auth.home') }}" class="brand">
-            <div class="brand-icon"></div>
+          <a href="{{ url_for('auth.home') }}" class="brand" aria-label="E16 LMS">
+            <div class="brand-icon">E16</div>
             <span>{{ site_name }}</span>
           </a>
         </div>
-        <nav class="sidebar-nav">
+
+        <nav class="sidebar-nav" aria-label="Điều hướng chính">
           {% if current_user.role == 'student' %}
-            <a href="{{ url_for('student.dashboard') }}" class="nav-item {% if request.endpoint == 'student.dashboard' %}active{% endif %}">
-              <span>Dashboard</span>
-            </a>
-            <a href="{{ url_for('student.list_courses') }}" class="nav-item {% if request.endpoint == 'student.list_courses' %}active{% endif %}">
-              <span>Khám phá</span>
-            </a>
-            <a href="{{ url_for('student.view_transcript') }}" class="nav-item {% if request.endpoint == 'student.view_transcript' %}active{% endif %}">
-              <span>Học bạ</span>
-            </a>
-            <a href="{{ url_for('student.view_calendar') }}" class="nav-item {% if request.endpoint == 'student.view_calendar' %}active{% endif %}">
-              <span>Lịch học</span>
-            </a>
-            <a href="{{ url_for('student.view_certificates') }}" class="nav-item {% if request.endpoint == 'student.view_certificates' %}active{% endif %}">
-              <span>Chứng chỉ</span>
-            </a>
+            <a href="{{ url_for('student.dashboard') }}" class="nav-item {% if request.endpoint == 'student.dashboard' %}active{% endif %}"><span>Dashboard</span></a>
+            <a href="{{ url_for('student.list_courses') }}" class="nav-item {% if request.endpoint == 'student.list_courses' %}active{% endif %}"><span>Khám phá</span></a>
+            <a href="{{ url_for('student.view_transcript') }}" class="nav-item {% if request.endpoint == 'student.view_transcript' %}active{% endif %}"><span>Học bạ</span></a>
+            <a href="{{ url_for('student.view_calendar') }}" class="nav-item {% if request.endpoint == 'student.view_calendar' %}active{% endif %}"><span>Lịch học</span></a>
+            <a href="{{ url_for('student.view_certificates') }}" class="nav-item {% if request.endpoint == 'student.view_certificates' %}active{% endif %}"><span>Chứng chỉ</span></a>
           {% elif current_user.role == 'teacher' %}
-            <a href="{{ url_for('teacher.dashboard') }}" class="nav-item {% if request.endpoint == 'teacher.dashboard' %}active{% endif %}">
-              <span>Dashboard</span>
-            </a>
-            <a href="{{ url_for('teacher.manage_courses') }}" class="nav-item {% if request.endpoint != 'teacher.dashboard' and request.blueprint == 'teacher' %}active{% endif %}">
-              <span>Khóa học của tôi</span>
-            </a>
+            <a href="{{ url_for('teacher.dashboard') }}" class="nav-item {% if request.endpoint == 'teacher.dashboard' %}active{% endif %}"><span>Dashboard</span></a>
+            <a href="{{ url_for('teacher.manage_courses') }}" class="nav-item {% if request.endpoint != 'teacher.dashboard' and request.blueprint == 'teacher' %}active{% endif %}"><span>Khóa học của tôi</span></a>
           {% elif current_user.role == 'admin' %}
-            <a href="{{ url_for('analytics.dashboard') }}" class="nav-item {% if request.blueprint == 'analytics' %}active{% endif %}">
-              <span>Thống kê</span>
-            </a>
-            <a href="{{ url_for('admin.list_users') }}" class="nav-item {% if request.endpoint == 'admin.list_users' %}active{% endif %}">
-              <span>Người dùng</span>
-            </a>
-            <a href="{{ url_for('admin.import_users_view') }}" class="nav-item {% if request.endpoint == 'admin.import_users_view' %}active{% endif %}">
-              <span>Import hàng loạt</span>
-            </a>
-            <a href="{{ url_for('admin.pending_courses') }}" class="nav-item {% if request.endpoint == 'admin.pending_courses' %}active{% endif %}">
-              <span>Duyệt bài</span>
-            </a>
-            <a href="{{ url_for('admin.list_categories') }}" class="nav-item {% if request.endpoint == 'admin.list_categories' %}active{% endif %}">
-              <span>Danh mục</span>
-            </a>
-            <a href="{{ url_for('admin.view_settings') }}" class="nav-item {% if request.endpoint == 'admin.view_settings' %}active{% endif %}">
-              <span>Cấu hình</span>
-            </a>
-            <a href="{{ url_for('admin.view_audit_log') }}" class="nav-item {% if request.endpoint == 'admin.view_audit_log' %}active{% endif %}">
-              <span>Audit Log</span>
-            </a>
-            <a href="{{ url_for('admin.list_reports') }}" class="nav-item {% if request.endpoint == 'admin.list_reports' %}active{% endif %}">
-              <span>Báo cáo nội dung</span>
-            </a>
+            <a href="{{ url_for('analytics.dashboard') }}" class="nav-item {% if request.blueprint == 'analytics' %}active{% endif %}"><span>Thống kê</span></a>
+            <a href="{{ url_for('admin.list_users') }}" class="nav-item {% if request.endpoint == 'admin.list_users' %}active{% endif %}"><span>Người dùng</span></a>
+            <a href="{{ url_for('admin.import_users_view') }}" class="nav-item {% if request.endpoint == 'admin.import_users_view' %}active{% endif %}"><span>Import hàng loạt</span></a>
+            <a href="{{ url_for('admin.pending_courses') }}" class="nav-item {% if request.endpoint == 'admin.pending_courses' %}active{% endif %}"><span>Duyệt khóa học</span></a>
+            <a href="{{ url_for('admin.list_categories') }}" class="nav-item {% if request.endpoint == 'admin.list_categories' %}active{% endif %}"><span>Danh mục</span></a>
+            <a href="{{ url_for('admin.view_settings') }}" class="nav-item {% if request.endpoint == 'admin.view_settings' %}active{% endif %}"><span>Cấu hình</span></a>
+            <a href="{{ url_for('admin.view_audit_log') }}" class="nav-item {% if request.endpoint == 'admin.view_audit_log' %}active{% endif %}"><span>Audit Log</span></a>
+            <a href="{{ url_for('admin.list_reports') }}" class="nav-item {% if request.endpoint == 'admin.list_reports' %}active{% endif %}"><span>Báo cáo nội dung</span></a>
           {% elif current_user.role == 'hoc_vu' %}
-            <a href="{{ url_for('hoc_vu.dashboard') }}" class="nav-item {% if request.endpoint == 'hoc_vu.dashboard' %}active{% endif %}">
-              <span>Dashboard</span>
-            </a>
-            <a href="{{ url_for('hoc_vu.pending_courses') }}" class="nav-item {% if request.endpoint == 'hoc_vu.pending_courses' %}active{% endif %}">
-              <span>Duyệt khoá học</span>
-            </a>
+            <a href="{{ url_for('hoc_vu.dashboard') }}" class="nav-item {% if request.endpoint == 'hoc_vu.dashboard' %}active{% endif %}"><span>Dashboard</span></a>
+            <a href="{{ url_for('hoc_vu.pending_courses') }}" class="nav-item {% if request.endpoint == 'hoc_vu.pending_courses' %}active{% endif %}"><span>Duyệt khóa học</span></a>
           {% elif current_user.role == 'le_tan' %}
-            <a href="{{ url_for('le_tan.dashboard') }}" class="nav-item {% if request.endpoint == 'le_tan.dashboard' %}active{% endif %}">
-              <span>Dashboard Lễ tân</span>
-            </a>
-            <a href="{{ url_for('le_tan.list_students') }}" class="nav-item {% if request.endpoint in ('le_tan.list_students', 'le_tan.student_detail') %}active{% endif %}">
-              <span>Tra cứu học viên</span>
-            </a>
-            <a href="{{ url_for('le_tan.create_student') }}" class="nav-item {% if request.endpoint == 'le_tan.create_student' %}active{% endif %}">
-              <span>Tạo học viên mới</span>
-            </a>
-            <a href="{{ url_for('le_tan.enroll_student') }}" class="nav-item {% if request.endpoint == 'le_tan.enroll_student' %}active{% endif %}">
-              <span>Đăng ký học tại quầy</span>
-            </a>
+            <a href="{{ url_for('le_tan.dashboard') }}" class="nav-item {% if request.endpoint == 'le_tan.dashboard' %}active{% endif %}"><span>Dashboard Lễ tân</span></a>
+            <a href="{{ url_for('le_tan.list_students') }}" class="nav-item {% if request.endpoint in ('le_tan.list_students', 'le_tan.student_detail') %}active{% endif %}"><span>Tra cứu học viên</span></a>
+            <a href="{{ url_for('le_tan.create_student') }}" class="nav-item {% if request.endpoint == 'le_tan.create_student' %}active{% endif %}"><span>Tạo học viên mới</span></a>
+            <a href="{{ url_for('le_tan.enroll_student') }}" class="nav-item {% if request.endpoint == 'le_tan.enroll_student' %}active{% endif %}"><span>Đăng ký tại quầy</span></a>
           {% elif current_user.role == 'ke_toan' %}
-            <a href="{{ url_for('ke_toan.dashboard') }}" class="nav-item {% if request.endpoint == 'ke_toan.dashboard' %}active{% endif %}">
-              <span>Dashboard tài chính</span>
-            </a>
-            <a href="{{ url_for('ke_toan.reconciliation') }}" class="nav-item {% if request.endpoint == 'ke_toan.reconciliation' %}active{% endif %}">
-              <span>Đối soát thanh toán</span>
-            </a>
-            <a href="{{ url_for('ke_toan.revenue') }}" class="nav-item {% if request.endpoint == 'ke_toan.revenue' %}active{% endif %}">
-              <span>Sổ thu chi chi tiết</span>
-            </a>
+            <a href="{{ url_for('ke_toan.dashboard') }}" class="nav-item {% if request.endpoint == 'ke_toan.dashboard' %}active{% endif %}"><span>Dashboard tài chính</span></a>
+            <a href="{{ url_for('ke_toan.reconciliation') }}" class="nav-item {% if request.endpoint == 'ke_toan.reconciliation' %}active{% endif %}"><span>Đối soát thanh toán</span></a>
+            <a href="{{ url_for('ke_toan.revenue') }}" class="nav-item {% if request.endpoint == 'ke_toan.revenue' %}active{% endif %}"><span>Sổ thu chi</span></a>
           {% endif %}
         </nav>
+
         <div class="sidebar-footer">
           <div class="user-profile">
-            <a href="{{ url_for('communication.list_notifications') }}" style="position: relative; margin-right: 20px; color: var(--text-main); text-decoration: none;">
-              <span style="font-size: 1.2rem;">🔔</span>
-              {% if unread_notifs_count > 0 %}
-                <span class="badge" style="position: absolute; top: -8px; right: -8px; background: var(--danger); color: white; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; border: 2px solid white;">
-                  {{ unread_notifs_count }}
-                </span>
-              {% endif %}
+            <a href="{{ url_for('communication.list_notifications') }}" class="notification-link" aria-label="Thông báo">
+              <span>Thông báo</span>
+              <span class="badge badge-danger notification-badge" data-unread-url="{{ url_for('communication.unread_count') }}" hidden></span>
             </a>
             <div class="user-avatar">{{ current_user.email[0].upper() }}</div>
             <div class="user-info">
               <div class="user-name">{{ current_user.email.split('@')[0] }}</div>
-              <div class="user-role">{{ current_user.role.capitalize() }}</div>
+              <div class="user-role">{{ current_user.role.replace('_', ' ')|title }}</div>
             </div>
           </div>
-          <a href="{{ url_for('auth.logout') }}" class="btn btn-outline btn-sm" style="width: 100%;">Đăng xuất</a>
+          <a href="{{ url_for('auth.logout') }}" class="btn btn-outline btn-sm" style="width: 100%;" data-turbo="false">Đăng xuất</a>
         </div>
       </aside>
       {% endif %}
 
-      <main class="main-content" style="{% if not current_user.is_authenticated %}margin-left: 0; display: flex; align-items: center; justify-content: center; padding: 0;{% endif %}">
-        <div class="flash-messages">
+      <main id="mainContent" class="main-content {% if not current_user.is_authenticated %}auth-main{% endif %}" data-page="{{ request.endpoint or 'unknown' }}" tabindex="-1">
+        <div class="flash-messages" aria-live="polite" aria-atomic="true">
           {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
               {% for category, message in messages %}
-                <div class="flash {{ category }}">{{ message }}</div>
+                <div class="flash {{ category }}">
+                  <span>{{ message }}</span>
+                  <button type="button" class="flash-close" aria-label="Đóng thông báo">x</button>
+                </div>
               {% endfor %}
             {% endif %}
           {% endwith %}
         </div>
-        
+
+        <div class="page-transition" id="pageTransition"></div>
         {% block content %}{% endblock %}
       </main>
     </div>
 
-    <script nonce="{{ csp_nonce() }}">
-      // Flash messages auto-hide
-      setTimeout(() => {
-        document.querySelectorAll('.flash').forEach(el => {
-          el.style.opacity = '0';
-          el.style.transform = 'translateX(20px)';
-          el.style.transition = 'all 0.5s ease';
-          setTimeout(() => el.remove(), 500);
-        });
-      }, 4000);
-    </script>
-
-    <!-- Global Glassmorphism Confirmation Modal -->
     <div class="confirm-overlay" id="confirmOverlay">
-      <div class="confirm-modal">
-        <div class="confirm-icon" id="confirmIcon">⚠️</div>
+      <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <div class="confirm-icon" id="confirmIcon">!</div>
         <div class="confirm-title" id="confirmTitle">Xác nhận hành động</div>
         <div class="confirm-message" id="confirmMessage">Bạn có chắc chắn muốn thực hiện hành động này?</div>
         <div class="confirm-actions">
@@ -165,55 +106,6 @@
       </div>
     </div>
 
-    <script nonce="{{ csp_nonce() }}">
-      (function() {
-        const overlay = document.getElementById('confirmOverlay');
-        const titleEl = document.getElementById('confirmTitle');
-        const msgEl = document.getElementById('confirmMessage');
-        const iconEl = document.getElementById('confirmIcon');
-        const okBtn = document.getElementById('confirmOk');
-        const cancelBtn = document.getElementById('confirmCancel');
-        let pendingForm = null;
-
-        function showModal(title, message, icon) {
-          titleEl.textContent = title || 'Xac nhan hanh dong';
-          msgEl.textContent = message || 'Ban co chac chan?';
-          iconEl.textContent = icon || '⚠️';
-          overlay.classList.add('active');
-        }
-
-        function hideModal() {
-          overlay.classList.remove('active');
-          pendingForm = null;
-        }
-
-        cancelBtn.addEventListener('click', hideModal);
-        overlay.addEventListener('click', function(e) {
-          if (e.target === overlay) hideModal();
-        });
-        document.addEventListener('keydown', function(e) {
-          if (e.key === 'Escape' && overlay.classList.contains('active')) hideModal();
-        });
-
-        okBtn.addEventListener('click', function() {
-          if (pendingForm) {
-            pendingForm.setAttribute('data-confirmed', 'true');
-            pendingForm.requestSubmit ? pendingForm.requestSubmit() : pendingForm.submit();
-          }
-          hideModal();
-        });
-
-        // Global confirmAction function for forms
-        window.confirmAction = function(form, title, message, icon) {
-          if (form.getAttribute('data-confirmed') === 'true') {
-            form.removeAttribute('data-confirmed');
-            return true;
-          }
-          pendingForm = form;
-          showModal(title, message, icon);
-          return false; // prevent default form submission
-        };
-      })();
-    </script>
+    {% block body_scripts %}{% endblock %}
   </body>
 </html>

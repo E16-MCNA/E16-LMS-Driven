@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+from datetime import timedelta
 from werkzeug.utils import secure_filename
 from flask import Blueprint, flash, redirect, render_template, request, url_for, current_app, session
 from flask_login import current_user
@@ -79,56 +80,257 @@ def dashboard():
     from sqlalchemy.orm import joinedload
     enrollments = db.session.query(Enrollment).options(joinedload(Enrollment.course)).filter(Enrollment.user_id == current_user.id).all()
     rows = []
-    total_completed_lessons = 0
+    now = utcnow()
+    deadline_window = now + timedelta(days=14)
+    active_courses = []
+    course_title_map = {}
 
     for en in enrollments:
         course = en.course
         if not course or course.is_deleted:
             continue
+        active_courses.append((en, course))
+        course_title_map[course.id] = course.title
 
-        my_rate = student_completion_rate(current_user.id, course.id)
+    active_course_ids = [course.id for _, course in active_courses]
+    lesson_counts = {}
+    student_completed_counts = {}
+    completed_lesson_ids_by_course = {}
+    lessons_by_course = {}
+    total_completed_lessons = 0
+    total_progress = 0
 
-        # Find next lesson
-        completed_lesson_ids = {
-            log.lesson_id for log in db.session.query(LearningLog).filter_by(
-                user_id=current_user.id, action_type="complete"
-            ).join(Lesson).filter(Lesson.course_id == course.id).all()
+    if active_course_ids:
+        lesson_counts = {
+            course_id: count
+            for course_id, count in db.session.query(Lesson.course_id, func.count(Lesson.id))
+            .filter(Lesson.course_id.in_(active_course_ids))
+            .group_by(Lesson.course_id)
+            .all()
         }
-        total_completed_lessons += len(completed_lesson_ids)
 
-        next_lesson = db.session.query(Lesson).filter(
-            Lesson.course_id == course.id,
-            ~Lesson.id.in_(completed_lesson_ids)
-        ).order_by(Lesson.sequence_order.asc()).first()
+        all_lessons = (
+            db.session.query(Lesson)
+            .filter(Lesson.course_id.in_(active_course_ids))
+            .order_by(Lesson.course_id, Lesson.sequence_order.asc())
+            .all()
+        )
+        for lesson in all_lessons:
+            lessons_by_course.setdefault(lesson.course_id, []).append(lesson)
 
+        completed_rows = (
+            db.session.query(Lesson.course_id, LearningLog.lesson_id)
+            .join(Lesson, Lesson.id == LearningLog.lesson_id)
+            .filter(
+                LearningLog.user_id == current_user.id,
+                LearningLog.action_type == "complete",
+                Lesson.course_id.in_(active_course_ids),
+            )
+            .distinct()
+            .all()
+        )
+        for course_id, lesson_id in completed_rows:
+            completed_lesson_ids_by_course.setdefault(course_id, set()).add(lesson_id)
+        student_completed_counts = {
+            course_id: len(lesson_ids)
+            for course_id, lesson_ids in completed_lesson_ids_by_course.items()
+        }
+        total_completed_lessons = sum(student_completed_counts.values())
+
+    for en, course in active_courses:
+        total_lessons = lesson_counts.get(course.id, 0) or 0
+        completed_count = student_completed_counts.get(course.id, 0)
+        my_rate = (completed_count / total_lessons * 100.0) if total_lessons else 0.0
+        total_progress += my_rate
+        completed_lesson_ids = completed_lesson_ids_by_course.get(course.id, set())
+        next_lesson = next((lesson for lesson in lessons_by_course.get(course.id, []) if lesson.id not in completed_lesson_ids), None)
         rows.append({
             "course": course,
             "enrollment": en,
             "my_rate": my_rate,
-            "avg_rate": class_average_completion_rate(course.id),
             "next_lesson": next_lesson
         })
 
+    upcoming_deadlines = []
+    if False and active_course_ids:
+        quizzes = db.session.query(Quiz).filter(
+            Quiz.course_id.in_(active_course_ids),
+            Quiz.is_published == True,
+            Quiz.due_date != None,
+            Quiz.due_date >= now,
+            Quiz.due_date <= deadline_window,
+        ).all()
+        quiz_ids = [quiz.id for quiz in quizzes]
+        attempted_quiz_ids = set()
+        if quiz_ids:
+            attempted_quiz_ids = {
+                row[0]
+                for row in db.session.query(QuizAttempt.quiz_id)
+                .filter(QuizAttempt.user_id == current_user.id, QuizAttempt.quiz_id.in_(quiz_ids))
+                .all()
+            }
+        for quiz in quizzes:
+            if quiz.id not in attempted_quiz_ids:
+                upcoming_deadlines.append({
+                    "type": "Quiz",
+                    "title": quiz.title,
+                    "course": course_title_map.get(quiz.course_id, ""),
+                    "deadline": quiz.due_date,
+                    "url": url_for("student.take_quiz", course_id=quiz.course_id, quiz_id=quiz.id),
+                })
+
+        assignments = db.session.query(Assignment).filter(
+            Assignment.course_id.in_(active_course_ids),
+            Assignment.deadline != None,
+            Assignment.deadline >= now,
+            Assignment.deadline <= deadline_window,
+        ).all()
+        assignment_ids = [assignment.id for assignment in assignments]
+        submitted_assignment_ids = set()
+        if assignment_ids:
+            submitted_assignment_ids = {
+                row[0]
+                for row in db.session.query(Submission.assignment_id)
+                .filter(Submission.user_id == current_user.id, Submission.assignment_id.in_(assignment_ids))
+                .all()
+            }
+        for assignment in assignments:
+            if assignment.id not in submitted_assignment_ids:
+                upcoming_deadlines.append({
+                    "type": "Assignment",
+                    "title": assignment.title,
+                    "course": course_title_map.get(assignment.course_id, ""),
+                    "deadline": assignment.deadline,
+                    "url": url_for("student.submit_assignment", course_id=assignment.course_id, assignment_id=assignment.id),
+                })
+
     # Recent activity
-    recent_logs = db.session.query(LearningLog, Lesson).join(Lesson).filter(
+    recent_logs = [] if True else db.session.query(LearningLog, Lesson).join(Lesson).filter(
         LearningLog.user_id == current_user.id,
         LearningLog.action_type == "complete"
     ).order_by(LearningLog.timestamp.desc()).limit(5).all()
 
     # Stats — calculate actual learning streak (consecutive days with completions)
-    streak = _calc_streak(current_user.id)
+    streak = "-"
     stats = {
         "total_courses": len(enrollments),
         "total_completed_lessons": total_completed_lessons,
-        "streak": streak
+        "streak": streak,
+        "avg_progress": round(total_progress / len(rows), 1) if rows else 0,
+        "deadline_count": "-",
     }
+    upcoming_deadlines.sort(key=lambda item: item["deadline"])
 
     return render_template(
         "student_dashboard.html",
         rows=rows,
         recent_logs=recent_logs,
-        stats=stats
+        stats=stats,
+        upcoming_deadlines=upcoming_deadlines[:6],
+        side_data_url=url_for("student.dashboard_side_data"),
     )
+
+
+@bp.get("/dashboard/side-data")
+@login_required
+@role_required("student")
+def dashboard_side_data():
+    from sqlalchemy.orm import joinedload
+
+    now = utcnow()
+    deadline_window = now + timedelta(days=14)
+    enrollments = (
+        db.session.query(Enrollment)
+        .options(joinedload(Enrollment.course))
+        .filter(
+            Enrollment.user_id == current_user.id,
+            Enrollment.status.in_(["active", "completed"]),
+        )
+        .all()
+    )
+    course_title_map = {
+        en.course.id: en.course.title
+        for en in enrollments
+        if en.course and not en.course.is_deleted
+    }
+    active_course_ids = list(course_title_map.keys())
+
+    upcoming_deadlines = []
+    if active_course_ids:
+        quizzes = db.session.query(Quiz).filter(
+            Quiz.course_id.in_(active_course_ids),
+            Quiz.is_published == True,
+            Quiz.due_date != None,
+            Quiz.due_date >= now,
+            Quiz.due_date <= deadline_window,
+        ).all()
+        quiz_ids = [quiz.id for quiz in quizzes]
+        attempted_quiz_ids = set()
+        if quiz_ids:
+            attempted_quiz_ids = {
+                row[0]
+                for row in db.session.query(QuizAttempt.quiz_id)
+                .filter(QuizAttempt.user_id == current_user.id, QuizAttempt.quiz_id.in_(quiz_ids))
+                .all()
+            }
+        for quiz in quizzes:
+            if quiz.id not in attempted_quiz_ids:
+                upcoming_deadlines.append({
+                    "type": "Quiz",
+                    "title": quiz.title,
+                    "course": course_title_map.get(quiz.course_id, ""),
+                    "deadline": quiz.due_date,
+                    "deadline_label": quiz.due_date.strftime("%d/%m %H:%M"),
+                    "url": url_for("student.take_quiz", course_id=quiz.course_id, quiz_id=quiz.id),
+                })
+
+        assignments = db.session.query(Assignment).filter(
+            Assignment.course_id.in_(active_course_ids),
+            Assignment.deadline != None,
+            Assignment.deadline >= now,
+            Assignment.deadline <= deadline_window,
+        ).all()
+        assignment_ids = [assignment.id for assignment in assignments]
+        submitted_assignment_ids = set()
+        if assignment_ids:
+            submitted_assignment_ids = {
+                row[0]
+                for row in db.session.query(Submission.assignment_id)
+                .filter(Submission.user_id == current_user.id, Submission.assignment_id.in_(assignment_ids))
+                .all()
+            }
+        for assignment in assignments:
+            if assignment.id not in submitted_assignment_ids:
+                upcoming_deadlines.append({
+                    "type": "Assignment",
+                    "title": assignment.title,
+                    "course": course_title_map.get(assignment.course_id, ""),
+                    "deadline": assignment.deadline,
+                    "deadline_label": assignment.deadline.strftime("%d/%m %H:%M"),
+                    "url": url_for("student.submit_assignment", course_id=assignment.course_id, assignment_id=assignment.id),
+                })
+
+    upcoming_deadlines.sort(key=lambda item: item["deadline"])
+    recent_logs = db.session.query(LearningLog, Lesson).join(Lesson).filter(
+        LearningLog.user_id == current_user.id,
+        LearningLog.action_type == "complete"
+    ).order_by(LearningLog.timestamp.desc()).limit(5).all()
+
+    return {
+        "deadline_count": len(upcoming_deadlines),
+        "streak": _calc_streak(current_user.id),
+        "deadlines": [
+            {key: value for key, value in item.items() if key != "deadline"}
+            for item in upcoming_deadlines[:6]
+        ],
+        "recent_logs": [
+            {
+                "title": lesson.title,
+                "timestamp": log.timestamp.strftime("%d/%m/%Y %H:%M") if log.timestamp else "",
+            }
+            for log, lesson in recent_logs
+        ],
+    }
 
 
 @bp.route("/checkout/<course_id>")
@@ -642,7 +844,6 @@ def _calc_streak(user_id):
 # Import progress calculation helpers from the centralized service layer
 from ..services import (
     student_completion_rate,
-    class_average_completion_rate,
     update_enrollment_if_completed
 )
 
