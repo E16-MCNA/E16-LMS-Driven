@@ -1,70 +1,118 @@
 {% extends "base.html" %}
 {% block content %}
-<header class="top-header">
+<header class="top-header dashboard-hero">
   <div>
-    <h1>Quầy Tiếp Đón Lễ Tân</h1>
-    <p>Chào mừng quay trở lại! Dưới đây là hoạt động đăng ký học tập hôm nay.</p>
+    <div class="eyebrow">Front desk</div>
+    <h1>Quầy tiếp đón lễ tân</h1>
+    <p>Tạo tài khoản, tra cứu hồ sơ và ghi danh học viên tại quầy nhanh hơn.</p>
+  </div>
+  <div class="actions">
+    <a href="{{ url_for('le_tan.create_student') }}" class="btn btn-primary">Tạo học viên</a>
+    <a href="{{ url_for('le_tan.enroll_student') }}" class="btn btn-outline">Ghi danh tại quầy</a>
   </div>
 </header>
 
-<div class="stats-grid">
-  <div class="card stat-card">
-    <div style="font-size: 2.5rem; margin-bottom: 8px;">👥</div>
-    <div class="stat-value">{{ total_students }}</div>
-    <div class="stat-label">Học viên hệ thống</div>
+<div class="kpi-grid">
+  <div class="metric-card">
+    <span class="metric-label">Học viên hệ thống</span>
+    <strong>{{ total_students }}</strong>
   </div>
-  <div class="card stat-card">
-    <div style="font-size: 2.5rem; margin-bottom: 8px;">📚</div>
-    <div class="stat-value" style="color: var(--primary);">{{ active_courses }}</div>
-    <div class="stat-label">Khóa đang chạy</div>
+  <div class="metric-card">
+    <span class="metric-label">Đang hoạt động</span>
+    <strong>{{ active_students }}</strong>
   </div>
-  <div class="card stat-card">
-    <div style="font-size: 2.5rem; margin-bottom: 8px;">✨</div>
-    <div class="stat-value" style="color: var(--success);">{{ total_enrollments }}</div>
-    <div class="stat-label">Tổng lượt tham gia</div>
+  <div class="metric-card">
+    <span class="metric-label">Khóa đang mở</span>
+    <strong>{{ active_courses }}</strong>
   </div>
-</div>
-
-<div class="card" style="margin-bottom: 32px;">
-  <h3 style="margin-bottom: 16px; font-weight: 700; color: #fff;">⚡ Nghiệp vụ hỗ trợ tại Quầy</h3>
-  <div style="display: flex; flex-wrap: wrap; gap: 12px;">
-    <a href="{{ url_for('le_tan.create_student') }}" class="btn btn-primary">➕ Tạo học viên mới</a>
-    <a href="{{ url_for('le_tan.enroll_student') }}" class="btn btn-outline">🖊️ Đăng ký học tại quầy (Tiền mặt)</a>
-    <a href="{{ url_for('le_tan.list_students') }}" class="btn btn-outline">🔍 Tra cứu hồ sơ học viên</a>
+  <div class="metric-card">
+    <span class="metric-label">Chờ thanh toán</span>
+    <strong>{{ pending_payments }}</strong>
   </div>
 </div>
 
-<div class="card">
-  <h2 style="margin-bottom: 20px; font-weight: 700;">👤 Học viên đăng ký gần đây</h2>
-  {% if recent_students %}
-  <div style="overflow-x: auto;">
-    <table class="table" style="width: 100%; border-collapse: collapse;">
-      <thead>
-        <tr style="text-align: left; border-bottom: 1px solid var(--card-border);">
-          <th style="padding: 12px;">Email</th>
-          <th style="padding: 12px;">Số điện thoại</th>
-          <th style="padding: 12px;">Ngày tham gia</th>
-          <th style="padding: 12px;">Hành động</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for s in recent_students %}
-        <tr style="border-bottom: 1px solid var(--card-border);">
-          <td style="padding: 12px; font-weight: 600;">{{ s.email }}</td>
-          <td style="padding: 12px; color: var(--text-muted);">{{ s.phone or 'Chưa cập nhật' }}</td>
-          <td style="padding: 12px; color: var(--text-muted);">{{ s.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
-          <td style="padding: 12px;">
-            <a href="{{ url_for('le_tan.student_detail', user_id=s.id) }}" class="btn btn-outline btn-sm">Xem hồ sơ</a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="empty-box" style="text-align: center; padding: 40px; color: var(--text-muted);">
-    Chưa có tài khoản học viên nào được ghi nhận.
-  </div>
-  {% endif %}
+<div class="dashboard-grid">
+  <section class="dashboard-main">
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Học viên mới</h2>
+          <p>Các tài khoản student được tạo gần đây nhất.</p>
+        </div>
+        <a href="{{ url_for('le_tan.list_students') }}" class="btn btn-outline btn-sm">Tra cứu</a>
+      </div>
+      {% if recent_students %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Số điện thoại</th>
+                <th>Ngày tạo</th>
+                <th>Hành động</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in recent_students %}
+              <tr>
+                <td style="font-weight: 700;">{{ s.email }}</td>
+                <td style="color: var(--text-muted);">{{ s.phone or 'Chưa cập nhật' }}</td>
+                <td style="color: var(--text-muted);">{{ s.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td><a href="{{ url_for('le_tan.student_detail', user_id=s.id) }}" class="btn btn-outline btn-sm">Xem hồ sơ</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <h3>Chưa có học viên</h3>
+          <p>Tạo tài khoản học viên đầu tiên từ quầy lễ tân.</p>
+        </div>
+      {% endif %}
+    </section>
+  </section>
+
+  <aside class="dashboard-side">
+    <section class="panel">
+      <div class="panel-header compact">
+        <h2>Nghiệp vụ nhanh</h2>
+      </div>
+      <div class="quick-actions">
+        <a href="{{ url_for('le_tan.create_student') }}" class="quick-action">
+          <strong>Tạo học viên mới</strong>
+          <small>Cấp tài khoản và mật khẩu tạm</small>
+        </a>
+        <a href="{{ url_for('le_tan.enroll_student') }}" class="quick-action">
+          <strong>Ghi danh tại quầy</strong>
+          <small>Kích hoạt khóa sau khi thu tiền mặt</small>
+        </a>
+        <a href="{{ url_for('le_tan.list_students') }}" class="quick-action">
+          <strong>Tra cứu hồ sơ</strong>
+          <small>Tìm theo email hoặc số điện thoại</small>
+        </a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header compact">
+        <h2>Ghi danh gần đây</h2>
+        <span class="status-pill">{{ total_enrollments }}</span>
+      </div>
+      {% if recent_enrollments %}
+        <div class="task-list">
+          {% for e in recent_enrollments %}
+            <a class="task-item" href="{{ url_for('le_tan.student_detail', user_id=e.user_id) }}">
+              <span class="task-type">{{ e.status|replace('_', ' ')|title }}</span>
+              <strong>{{ e.user.email if e.user else 'Học viên ẩn' }}</strong>
+              <small>{{ e.course.title if e.course else 'Khóa học ẩn' }} · {{ e.enrolled_at.strftime('%d/%m %H:%M') if e.enrolled_at else 'N/A' }}</small>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state compact">Chưa có lượt ghi danh nào.</div>
+      {% endif %}
+    </section>
+  </aside>
 </div>
 {% endblock %}

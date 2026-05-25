@@ -141,6 +141,8 @@ def create_app():
                             {"email": "teacher_local@e16.local", "password_hash": generate_password_hash("teacher_local_pass"), "role": "teacher", "must_change_password": False},
                             {"email": "student_local@e16.local", "password_hash": generate_password_hash("student_local_pass"), "role": "student", "must_change_password": False},
                             {"email": "hocvu_local@e16.local", "password_hash": generate_password_hash("hocvu_local_pass"), "role": "hoc_vu", "must_change_password": False},
+                            {"email": "letan_local@e16.local", "password_hash": generate_password_hash("letan_local_pass"), "role": "le_tan", "must_change_password": False},
+                            {"email": "ketoan_local@e16.local", "password_hash": generate_password_hash("ketoan_local_pass"), "role": "ke_toan", "must_change_password": False},
                         ]
                     else:
                         users = [
@@ -148,6 +150,8 @@ def create_app():
                             {"email": "teacher@e16.local", "password_hash": generate_password_hash(seed_password), "role": "teacher", "must_change_password": False},
                             {"email": "student@e16.local", "password_hash": generate_password_hash(seed_password), "role": "student", "must_change_password": False},
                             {"email": "hocvu@e16.local", "password_hash": generate_password_hash(seed_password), "role": "hoc_vu", "must_change_password": False},
+                            {"email": "letan@e16.local", "password_hash": generate_password_hash(seed_password), "role": "le_tan", "must_change_password": False},
+                            {"email": "ketoan@e16.local", "password_hash": generate_password_hash(seed_password), "role": "ke_toan", "must_change_password": False},
                         ]
 
                     for u_data in users:
@@ -172,6 +176,8 @@ def create_app():
                         ("teacher@e16.local", "teacher"),
                         ("student@e16.local", "student"),
                         ("hocvu@e16.local", "hoc_vu"),
+                        ("letan@e16.local", "le_tan"),
+                        ("ketoan@e16.local", "ke_toan"),
                     ]
                     core_users.extend((f"student{i}@e16.local", "student") for i in range(1, 6))
 
@@ -232,6 +238,57 @@ def create_app():
                     db.session.commit()
                 except Exception:
                     pass
+
+    if os.environ.get("VERCEL") and os.getenv("E16_SEED_PASSWORD"):
+        with app.app_context():
+            try:
+                from werkzeug.security import check_password_hash, generate_password_hash
+                from .models import User
+
+                seed_password = os.getenv("E16_SEED_PASSWORD")
+                core_users = [
+                    ("admin@e16.local", "admin"),
+                    ("teacher@e16.local", "teacher"),
+                    ("student@e16.local", "student"),
+                    ("hocvu@e16.local", "hoc_vu"),
+                    ("letan@e16.local", "le_tan"),
+                    ("ketoan@e16.local", "ke_toan"),
+                ]
+                core_users.extend((f"student{i}@e16.local", "student") for i in range(1, 6))
+
+                mutated = False
+                for email, role in core_users:
+                    user = db.session.query(User).filter_by(email=email).first()
+                    if user is None:
+                        db.session.add(User(
+                            email=email,
+                            password_hash=generate_password_hash(seed_password),
+                            role=role,
+                            is_active=True,
+                            must_change_password=False,
+                        ))
+                        mutated = True
+                        continue
+
+                    if user.role != role:
+                        user.role = role
+                        mutated = True
+                    if not user.is_active:
+                        user.is_active = True
+                        mutated = True
+                    if getattr(user, "must_change_password", False):
+                        user.must_change_password = False
+                        mutated = True
+                    if not check_password_hash(user.password_hash, seed_password):
+                        user.password_hash = generate_password_hash(seed_password)
+                        mutated = True
+
+                if mutated:
+                    db.session.commit()
+                    app.logger.info("Vercel core demo accounts synchronized from E16_SEED_PASSWORD.")
+            except Exception as e:
+                db.session.rollback()
+                app.logger.error(f"Vercel core demo account sync failed: {str(e)}")
 
     csrf.init_app(app)
     login_manager.init_app(app)
@@ -346,12 +403,6 @@ def create_app():
             "public_site_url": public_origin(),
             "unread_notifs_count": 0
         }
-        try:
-            if current_user.is_authenticated:
-                from .models import Notification
-                data["unread_notifs_count"] = db.session.query(Notification).filter_by(user_id=current_user.id, is_read=False).count()
-        except Exception:
-            pass
         return data
 
     # --- Structured JSON Logging & Request ID correlation ---
@@ -413,6 +464,8 @@ def create_app():
     def append_request_id_header(response):
         if hasattr(g, "request_id"):
             response.headers["X-Request-ID"] = g.request_id
+        if request.endpoint == "static":
+            response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
         return response
 
     # --- Health Check Endpoints (/healthz, /readyz) ---

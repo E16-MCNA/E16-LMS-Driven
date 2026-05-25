@@ -35,6 +35,15 @@ def list_notifications():
     pagination = paginate_query(query, page, per_page)
     return render_template("notifications.html", notifications=pagination["items"], pagination=pagination)
 
+@bp.get("/notifications/unread-count")
+@login_required
+def unread_count():
+    count = db.session.query(func.count(Notification.id)).filter_by(
+        user_id=current_user.id,
+        is_read=False,
+    ).scalar() or 0
+    return jsonify({"count": int(count)})
+
 @bp.post("/notifications/<notif_id>/read")
 @login_required
 def mark_read(notif_id):

@@ -1,26 +1,91 @@
 {% extends "base.html" %}
 {% block content %}
-<header class="top-header">
+<header class="top-header dashboard-hero">
   <div>
-    <h1>Bảng điều khiển Học vụ</h1>
-    <p>Tổng quan hệ thống — duyệt khoá học, hoạt động.</p>
+    <div class="eyebrow">Academic affairs</div>
+    <h1>Bảng điều khiển học vụ</h1>
+    <p>Theo dõi hàng đợi duyệt khóa, quy mô học viên và vận hành học tập.</p>
+  </div>
+  <div class="actions">
+    <a href="{{ url_for('hoc_vu.pending_courses') }}" class="btn btn-primary">Duyệt khóa học</a>
+    <a href="{{ url_for('analytics.dashboard') }}" class="btn btn-outline">Báo cáo</a>
   </div>
 </header>
 
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 32px;">
-  <div class="card" style="text-align: center; padding: 24px;">
-    <div style="font-size: 2rem; margin-bottom: 8px;">📋</div>
-    <div style="font-size: 2rem; font-weight: 800; color: var(--primary);">{{ pending_courses }}</div>
-    <div style="font-size: 0.85rem; color: var(--text-muted);">Khoá chờ duyệt</div>
+<div class="kpi-grid">
+  <div class="metric-card">
+    <span class="metric-label">Chờ duyệt</span>
+    <strong>{{ pending_courses }}</strong>
   </div>
-  <div class="card" style="text-align: center; padding: 24px;">
-    <div style="font-size: 2rem; margin-bottom: 8px;">📚</div>
-    <div style="font-size: 2rem; font-weight: 800; color: var(--text-main);">{{ active_courses }}</div>
-    <div style="font-size: 0.85rem; color: var(--text-muted);">Khoá đang hoạt động</div>
+  <div class="metric-card">
+    <span class="metric-label">Khóa đang mở</span>
+    <strong>{{ active_courses }}</strong>
+  </div>
+  <div class="metric-card">
+    <span class="metric-label">Học viên</span>
+    <strong>{{ total_students }}</strong>
+  </div>
+  <div class="metric-card">
+    <span class="metric-label">Giảng viên</span>
+    <strong>{{ total_teachers }}</strong>
   </div>
 </div>
 
-<div style="display: flex; gap: 12px; margin-bottom: 32px;">
-  <a href="{{ url_for('hoc_vu.pending_courses') }}" class="btn btn-primary">📋 Duyệt khoá học ({{ pending_courses }})</a>
+<div class="dashboard-grid">
+  <section class="dashboard-main">
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Hàng đợi duyệt khóa</h2>
+          <p>Các khóa mới cần được kiểm tra nội dung trước khi công khai.</p>
+        </div>
+        <span class="status-pill">{{ pending_courses }} mục</span>
+      </div>
+      {% if recent_pending %}
+        <div class="task-list">
+          {% for course, teacher in recent_pending %}
+            <a class="task-item wide" href="{{ url_for('hoc_vu.pending_courses') }}">
+              <span class="task-type">Pending review</span>
+              <strong>{{ course.title }}</strong>
+              <small>{{ teacher.email }} · {{ course.submitted_at.strftime('%d/%m/%Y %H:%M') if course.submitted_at else 'Chưa có thời điểm gửi' }}</small>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <h3>Không có khóa chờ duyệt</h3>
+          <p>Hàng đợi học vụ đang trống.</p>
+        </div>
+      {% endif %}
+    </section>
+  </section>
+
+  <aside class="dashboard-side">
+    <section class="panel">
+      <div class="panel-header compact">
+        <h2>Tác vụ nhanh</h2>
+      </div>
+      <div class="quick-actions">
+        <a href="{{ url_for('hoc_vu.pending_courses') }}" class="quick-action">
+          <strong>Duyệt khóa</strong>
+          <small>Xem khóa đang chờ học vụ xử lý</small>
+        </a>
+        <a href="{{ url_for('analytics.dashboard') }}" class="quick-action">
+          <strong>Xem analytics</strong>
+          <small>Theo dõi user, enrollment và hoạt động học</small>
+        </a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header compact">
+        <h2>Quy mô vận hành</h2>
+      </div>
+      <div class="mini-stats">
+        <div><strong>{{ total_enrollments }}</strong><span>Lượt ghi danh</span></div>
+        <div><strong>{{ active_courses }}</strong><span>Khóa active</span></div>
+      </div>
+    </section>
+  </aside>
 </div>
 {% endblock %}

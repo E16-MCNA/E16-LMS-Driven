@@ -10,6 +10,7 @@ from datetime import timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response
 from flask_login import login_required, current_user
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 from ..auth_utils import role_required
 from ..extensions import db
 from ..models import User, Course, Enrollment
@@ -45,11 +46,19 @@ def dashboard():
     ).filter(
         Enrollment.status.in_(["active", "completed"]),
         Course.is_deleted == False
-    ).group_by(Course.id, Course.title).order_by(func.sum(func.coalesce(Enrollment.amount_paid, Course.price)).desc()).all()
+    ).group_by(Course.id, Course.title).order_by(func.sum(func.coalesce(Enrollment.amount_paid, Course.price)).desc()).limit(8).all()
+
+    course_revenue_count = db.session.query(func.count(func.distinct(Course.id))).select_from(Enrollment).join(
+        Course, Enrollment.course_id == Course.id
+    ).filter(
+        Enrollment.status.in_(["active", "completed"]),
+        Course.is_deleted == False
+    ).scalar() or 0
     
     # Recent 5 approved enrollments
     recent_transactions = (
         db.session.query(Enrollment)
+        .options(joinedload(Enrollment.user), joinedload(Enrollment.course))
         .filter(Enrollment.status.in_(["active", "completed"]))
         .order_by(Enrollment.enrolled_at.desc())
         .limit(5)
@@ -81,6 +90,7 @@ def dashboard():
         total_revenue=int(total_rev),
         pending_count=pending_count,
         course_revenue=course_rev_rows,
+        course_revenue_count=course_revenue_count,
         recent_transactions=recent_transactions,
         revenue_growth=revenue_growth
     )

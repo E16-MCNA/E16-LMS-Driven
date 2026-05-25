@@ -38,15 +38,40 @@ def dashboard():
     course_ids = [c.id for c in courses]
     total_students = 0
     total_lessons = 0
+    pending_submissions = 0
+    recent_submissions = []
     if course_ids:
         total_students = db.session.query(Enrollment).filter(Enrollment.course_id.in_(course_ids), Enrollment.status.in_(["active", "completed"])).count()
         total_lessons = db.session.query(Lesson).filter(Lesson.course_id.in_(course_ids)).count()
+        pending_submissions = (
+            db.session.query(Submission)
+            .join(Assignment, Assignment.id == Submission.assignment_id)
+            .filter(Assignment.course_id.in_(course_ids), Submission.status == "pending")
+            .count()
+        )
+        recent_submissions = (
+            db.session.query(Submission, Assignment, Course, User)
+            .join(Assignment, Assignment.id == Submission.assignment_id)
+            .join(Course, Course.id == Assignment.course_id)
+            .join(User, User.id == Submission.user_id)
+            .filter(Assignment.course_id.in_(course_ids))
+            .order_by(Submission.submitted_at.desc())
+            .limit(5)
+            .all()
+        )
         
+    pending_review_count = len([c for c in courses if c.status == "pending_review"])
+    draft_count = len([c for c in courses if c.status == "draft"])
+
     return render_template("teacher_dashboard.html", 
                            courses=courses[:5], 
                            total_courses=total_courses, 
                            total_students=total_students,
-                           total_lessons=total_lessons)
+                           total_lessons=total_lessons,
+                           pending_submissions=pending_submissions,
+                           recent_submissions=recent_submissions,
+                           pending_review_count=pending_review_count,
+                           draft_count=draft_count)
 
 @bp.route("/manage")
 @login_required

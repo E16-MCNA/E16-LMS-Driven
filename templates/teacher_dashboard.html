@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
-<header class="top-header">
+<header class="top-header dashboard-hero">
   <div>
-    <h1>Tổng quan Giảng dạy</h1>
-    <p style="color: var(--text-muted);">Chào mừng trở lại, hãy xem qua tiến độ các khóa học của bạn.</p>
+    <div class="eyebrow">Teacher workspace</div>
+    <h1>Tổng quan giảng dạy</h1>
+    <p>Theo dõi lớp đang dạy, bài cần chấm và trạng thái duyệt khóa học.</p>
   </div>
   <button type="button" class="btn btn-primary" onclick="document.getElementById('quick-create-form').submit();">
-    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
     Tạo khóa học nhanh
   </button>
   <form id="quick-create-form" action="{{ url_for('teacher.create_course') }}" method="post" style="display: none;">
@@ -15,61 +15,112 @@
   </form>
 </header>
 
-<div class="stats-grid">
-  <div class="card stat-card" style="border-top: 4px solid var(--primary);">
-    <div class="stat-value">{{ total_courses }}</div>
-    <div class="stat-label">Tổng số Khóa học</div>
+<div class="kpi-grid">
+  <div class="metric-card">
+    <span class="metric-label">Khóa học</span>
+    <strong>{{ total_courses }}</strong>
   </div>
-  <div class="card stat-card" style="border-top: 4px solid var(--success);">
-    <div class="stat-value">{{ total_students }}</div>
-    <div class="stat-label">Học viên Đăng ký</div>
+  <div class="metric-card">
+    <span class="metric-label">Học viên active</span>
+    <strong>{{ total_students }}</strong>
   </div>
-  <div class="card stat-card" style="border-top: 4px solid var(--warning);">
-    <div class="stat-value">{{ total_lessons }}</div>
-    <div class="stat-label">Bài giảng đã tạo</div>
+  <div class="metric-card">
+    <span class="metric-label">Bài giảng</span>
+    <strong>{{ total_lessons }}</strong>
+  </div>
+  <div class="metric-card">
+    <span class="metric-label">Bài cần chấm</span>
+    <strong>{{ pending_submissions }}</strong>
   </div>
 </div>
 
-<div class="card">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-    <h2>Khóa học gần đây</h2>
-    <a href="{{ url_for('teacher.manage_courses') }}" class="btn btn-outline btn-sm">Xem tất cả</a>
-  </div>
-  
-  {% if courses %}
-  <div style="overflow-x: auto;">
-    <table>
-      <thead>
-        <tr>
-          <th>Tên khóa học</th>
-          <th>Trạng thái</th>
-          <th>Danh mục</th>
-          <th>Thao tác</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for course in courses %}
-        <tr>
-          <td style="font-weight: 500;">{{ course.title }}</td>
-          <td>
-            <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; 
-                  background: {% if course.status == 'published' %}rgba(16, 185, 129, 0.2); color: var(--success);{% else %}rgba(245, 158, 11, 0.2); color: var(--warning);{% endif %}">
-              {{ course.status | upper }}
-            </span>
-          </td>
-          <td style="color: var(--text-muted);">{{ course.category.name if course.category else 'Chưa có' }}</td>
-          <td>
-            <a href="{{ url_for('teacher.edit_course', course_id=course.id) }}" class="btn btn-outline btn-sm">Sửa</a>
-            <a href="{{ url_for('teacher.manage_lessons', course_id=course.id) }}" class="btn btn-outline btn-sm">Bài giảng</a>
-            <a href="{{ url_for('teacher.course_students', course_id=course.id) }}" class="btn btn-outline btn-sm">Học viên</a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <p style="color: var(--text-muted); text-align: center; padding: 40px 0;">Bạn chưa có khóa học nào. Hãy bắt đầu tạo khóa học đầu tiên!</p>
-  {% endif %}
+<div class="dashboard-grid">
+  <section class="dashboard-main">
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Khóa học gần đây</h2>
+          <p>Duy trì nội dung, bài học và danh sách học viên từ một nơi.</p>
+        </div>
+        <a href="{{ url_for('teacher.manage_courses') }}" class="btn btn-outline btn-sm">Xem tất cả</a>
+      </div>
+
+      {% if courses %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tên khóa học</th>
+                <th>Trạng thái</th>
+                <th>Danh mục</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for course in courses %}
+              <tr>
+                <td style="font-weight: 700;">{{ course.title }}</td>
+                <td><span class="status-pill status-{{ course.status }}">{{ course.status|replace('_', ' ')|title }}</span></td>
+                <td style="color: var(--text-muted);">{{ course.category.name if course.category else 'Chưa có' }}</td>
+                <td>
+                  <div class="inline-actions">
+                    <a href="{{ url_for('teacher.edit_course', course_id=course.id) }}" class="btn btn-outline btn-sm">Sửa</a>
+                    <a href="{{ url_for('teacher.manage_lessons', course_id=course.id) }}" class="btn btn-outline btn-sm">Bài giảng</a>
+                    <a href="{{ url_for('teacher.course_students', course_id=course.id) }}" class="btn btn-outline btn-sm">Học viên</a>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <h3>Chưa có khóa học</h3>
+          <p>Tạo bản nháp đầu tiên, thêm bài học rồi gửi học vụ duyệt.</p>
+        </div>
+      {% endif %}
+    </section>
+  </section>
+
+  <aside class="dashboard-side">
+    <section class="panel">
+      <div class="panel-header compact">
+        <h2>Việc cần làm</h2>
+      </div>
+      <div class="task-list">
+        <a class="task-item" href="{{ url_for('teacher.manage_courses') }}">
+          <span class="task-type">Course</span>
+          <strong>{{ draft_count }} bản nháp cần hoàn thiện</strong>
+          <small>Thêm lesson, quiz, assignment trước khi gửi duyệt.</small>
+        </a>
+        <a class="task-item" href="{{ url_for('teacher.manage_courses') }}">
+          <span class="task-type">Review</span>
+          <strong>{{ pending_review_count }} khóa đang chờ duyệt</strong>
+          <small>Theo dõi phản hồi từ học vụ.</small>
+        </a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header compact">
+        <h2>Bài nộp mới</h2>
+        <span class="status-pill">{{ pending_submissions }}</span>
+      </div>
+      {% if recent_submissions %}
+        <div class="task-list">
+          {% for sub, assignment, course, user in recent_submissions %}
+            <a class="task-item" href="{{ url_for('teacher.view_submissions', assignment_id=assignment.id) }}">
+              <span class="task-type">{{ sub.status|title }}</span>
+              <strong>{{ assignment.title }}</strong>
+              <small>{{ user.email }} · {{ course.title }}</small>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state compact">Chưa có bài nộp mới.</div>
+      {% endif %}
+    </section>
+  </aside>
 </div>
 {% endblock %}

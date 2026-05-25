@@ -7,7 +7,8 @@ class SupabaseLogger:
     def __init__(self):
         url = os.environ.get("SUPABASE_URL")
         key = os.environ.get("SUPABASE_KEY")
-        if url and key:
+        enabled = os.environ.get("ENABLE_SUPABASE_EVENT_LOGS", "false").lower() in ("1", "true", "yes", "on")
+        if enabled and url and key:
             self.client: Client = create_client(url, key)
         else:
             self.client = None
@@ -18,7 +19,7 @@ class SupabaseLogger:
         """
         if not self.client:
             # Nếu chưa cấu hình Supabase, chỉ ghi ra console/log file
-            current_app.logger.info(f"Log (No Supabase): {action_type} by {user_email}")
+            current_app.logger.debug(f"Event log skipped: {action_type} by {user_email}")
             return
 
         try:

@@ -17,6 +17,7 @@ from flask import (
 )
 from flask_login import current_user
 from werkzeug.security import generate_password_hash
+from sqlalchemy import case, func
 
 from ..auth_utils import login_required, role_required
 from ..extensions import db
@@ -70,19 +71,34 @@ def _send_welcome_email(email: str, temp_password: str, role: str):
 @login_required
 @role_required("hoc_vu", "admin")
 def dashboard():
-    pending_courses = db.session.query(Course).filter(
-        Course.status == "pending_review",
-        Course.is_deleted == False,
-    ).count()
-    active_courses = db.session.query(Course).filter(
-        Course.status.in_(["published", "running"]),
-        Course.is_deleted == False,
-    ).count()
+    course_stats = db.session.query(
+        func.sum(case((Course.status == "pending_review", 1), else_=0)),
+        func.sum(case((Course.status.in_(["published", "running"]), 1), else_=0)),
+    ).filter(Course.is_deleted == False).one()
+    user_stats = db.session.query(
+        func.sum(case((User.role == "student", 1), else_=0)),
+        func.sum(case((User.role == "teacher", 1), else_=0)),
+    ).one()
+    total_enrollments = db.session.query(func.count(Enrollment.id)).filter(
+        Enrollment.status.in_(["active", "completed", "pending_payment"])
+    ).scalar() or 0
+    recent_pending = (
+        db.session.query(Course, User)
+        .join(User, User.id == Course.teacher_id)
+        .filter(Course.status == "pending_review", Course.is_deleted == False)
+        .order_by(Course.submitted_at.desc().nullslast(), Course.created_at.desc())
+        .limit(5)
+        .all()
+    )
 
     return render_template(
         "hocvu_dashboard.html",
-        pending_courses=pending_courses,
-        active_courses=active_courses,
+        pending_courses=course_stats[0] or 0,
+        active_courses=course_stats[1] or 0,
+        total_students=user_stats[0] or 0,
+        total_teachers=user_stats[1] or 0,
+        total_enrollments=total_enrollments,
+        recent_pending=recent_pending,
     )
 
 

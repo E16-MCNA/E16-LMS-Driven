@@ -2,85 +2,80 @@
 {% block content %}
 <header class="top-header">
   <div>
-    <h1>Bảng Điều Phối Tài Chính & Kế Toán</h1>
+    <h1>Bảng điều phối tài chính & kế toán</h1>
     <p>Đối soát học phí, thống kê doanh thu thực tế và phê duyệt ghi danh tại quầy / chuyển khoản.</p>
   </div>
 </header>
 
 <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 32px;">
   <div class="card stat-card" style="position: relative; overflow: hidden;">
-    <div style="font-size: 2.5rem; margin-bottom: 8px;">💰</div>
-    <div class="stat-value" style="color: var(--success); font-size: 2.2rem; font-weight: 800; text-shadow: 0 0 15px rgba(16, 185, 129, 0.2);">
+    <div class="stat-kicker">Doanh thu</div>
+    <div class="stat-value" style="color: var(--success); font-size: 2.2rem; font-weight: 800;">
       {{ "{:,.0f}".format(total_revenue) }}đ
     </div>
     <div class="stat-label">Tổng doanh thu thực tế</div>
-    <div style="position: absolute; right: -20px; bottom: -20px; font-size: 8rem; opacity: 0.03; font-weight: 900; pointer-events: none; color: var(--success);">
+    <div style="position: absolute; right: -20px; bottom: -20px; font-size: 8rem; opacity: 0.04; font-weight: 900; pointer-events: none; color: var(--success);">
       VND
     </div>
   </div>
 
   <div class="card stat-card" style="position: relative; overflow: hidden;">
-    <div style="font-size: 2.5rem; margin-bottom: 8px;">⏳</div>
-    <div class="stat-value" style="font-size: 2.2rem; font-weight: 800; {% if pending_count > 0 %}color: var(--warning); text-shadow: 0 0 15px rgba(245, 158, 11, 0.3);{% else %}color: var(--text-muted);{% endif %}">
+    <div class="stat-kicker">Đối soát</div>
+    <div class="stat-value" style="font-size: 2.2rem; font-weight: 800; {% if pending_count > 0 %}color: var(--warning);{% else %}color: var(--text-muted);{% endif %}">
       {{ pending_count }}
     </div>
     <div class="stat-label">Giao dịch chờ đối soát</div>
     {% if pending_count > 0 %}
-      <span class="badge" style="position: absolute; top: 16px; right: 16px; background: rgba(245, 158, 11, 0.15); color: var(--warning); font-size: 0.8rem; border: 1px solid rgba(245, 158, 11, 0.3); animation: pulse 2s infinite;">
+      <span class="badge" style="position: absolute; top: 16px; right: 16px; background: rgba(245, 158, 11, 0.14); color: #92400e; border: 1px solid rgba(245, 158, 11, 0.28);">
         Cần xử lý
       </span>
     {% endif %}
   </div>
 
   <div class="card stat-card" style="position: relative; overflow: hidden;">
-    <div style="font-size: 2.5rem; margin-bottom: 8px;">📊</div>
-    <div class="stat-value" style="color: var(--primary); font-size: 2.2rem; font-weight: 800; text-shadow: 0 0 15px rgba(99, 102, 241, 0.2);">
-      {{ course_revenue|length }}
+    <div class="stat-kicker">Khóa học</div>
+    <div class="stat-value" style="color: var(--primary); font-size: 2.2rem; font-weight: 800;">
+      {{ course_revenue_count }}
     </div>
     <div class="stat-label">Khóa học có doanh thu</div>
-    <div style="position: absolute; right: -20px; bottom: -20px; font-size: 8rem; opacity: 0.03; font-weight: 900; pointer-events: none; color: var(--primary);">
+    <div style="position: absolute; right: -20px; bottom: -20px; font-size: 8rem; opacity: 0.04; font-weight: 900; pointer-events: none; color: var(--primary);">
       LMS
     </div>
   </div>
 </div>
 
-<div class="card" style="margin-bottom: 32px; background: rgba(16, 22, 50, 0.8);">
-  <h3 style="margin-bottom: 16px; font-weight: 700; color: #fff;">⚡ Hành động kế toán nhanh</h3>
+<div class="card" style="margin-bottom: 32px;">
+  <h3 style="margin-bottom: 16px; font-weight: 700;">Hành động kế toán nhanh</h3>
   <div style="display: flex; flex-wrap: wrap; gap: 12px;">
     <a href="{{ url_for('ke_toan.reconciliation') }}" class="btn btn-primary">
-      🔍 Phê duyệt chuyển khoản
+      Phê duyệt chuyển khoản
       {% if pending_count > 0 %}
         <span style="background: rgba(255, 255, 255, 0.2); color: #fff; padding: 2px 8px; border-radius: 99px; font-size: 0.75rem; font-weight: 800; margin-left: 4px;">{{ pending_count }}</span>
       {% endif %}
     </a>
-    <a href="{{ url_for('ke_toan.revenue') }}" class="btn btn-outline">📓 Sổ chi tiết thu chi</a>
+    <a href="{{ url_for('ke_toan.revenue') }}" class="btn btn-outline">Sổ chi tiết thu chi</a>
     <a href="{{ url_for('ke_toan.export_revenue') }}" class="btn btn-outline" style="border-color: rgba(16, 185, 129, 0.3); color: var(--success);">
-      📥 Xuất báo cáo tài chính (CSV)
+      Xuất báo cáo tài chính CSV
     </a>
   </div>
 </div>
 
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px;" class="ketoan-sections">
-  <!-- Biểu đồ doanh thu (Chart.js) -->
   <div class="card" style="display: flex; flex-direction: column;">
-    <h3 style="margin-bottom: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-      📈 Xu hướng doanh thu (30 ngày qua)
-    </h3>
+    <h3 style="margin-bottom: 20px; font-weight: 700;">Xu hướng doanh thu 30 ngày qua</h3>
     <div style="flex: 1; min-height: 250px; display: flex; align-items: center; justify-content: center; position: relative;">
       {% if revenue_growth %}
         <canvas id="revenueChart" style="width: 100%; height: 100%; max-height: 280px;"></canvas>
       {% else %}
         <div style="text-align: center; color: var(--text-muted);">
-          <div style="font-size: 2.5rem; margin-bottom: 8px;">📭</div>
           Chưa có dữ liệu giao dịch trong 30 ngày qua để hiển thị biểu đồ.
         </div>
       {% endif %}
     </div>
   </div>
 
-  <!-- Doanh thu theo khoá học -->
   <div class="card" style="display: flex; flex-direction: column;">
-    <h3 style="margin-bottom: 20px; font-weight: 700;">📚 Doanh thu theo khóa học</h3>
+    <h3 style="margin-bottom: 20px; font-weight: 700;">Doanh thu theo khóa học</h3>
     <div style="flex: 1; overflow-y: auto; max-height: 280px;">
       {% if course_revenue %}
         <table style="width: 100%; border-collapse: collapse; margin-top: 0;">
@@ -93,8 +88,8 @@
           </thead>
           <tbody>
             {% for c in course_revenue %}
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
-              <td style="padding: 12px 8px; font-weight: 600; font-size: 0.9rem; color: #fff;">{{ c.title }}</td>
+            <tr style="border-bottom: 1px solid var(--card-border);">
+              <td style="padding: 12px 8px; font-weight: 600; font-size: 0.9rem; color: var(--text-main);">{{ c.title }}</td>
               <td style="padding: 12px 8px; text-align: center; font-size: 0.9rem; color: var(--text-muted);">{{ c.sales_count }}</td>
               <td style="padding: 12px 8px; text-align: right; font-size: 0.9rem; font-weight: 700; color: var(--success);">
                 {{ "{:,.0f}".format(c.course_revenue) }}đ
@@ -113,7 +108,7 @@
 </div>
 
 <div class="card">
-  <h3 style="margin-bottom: 20px; font-weight: 700;">👤 Giao dịch gần đây được duyệt</h3>
+  <h3 style="margin-bottom: 20px; font-weight: 700;">Giao dịch gần đây được duyệt</h3>
   {% if recent_transactions %}
     <div style="overflow-x: auto;">
       <table style="width: 100%; border-collapse: collapse; margin-top: 0;">
@@ -128,7 +123,7 @@
         </thead>
         <tbody>
           {% for r in recent_transactions %}
-          <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+          <tr style="border-bottom: 1px solid var(--card-border);">
             <td style="padding: 12px 8px; font-size: 0.85rem; color: var(--text-muted);">
               {{ r.enrolled_at.strftime('%d/%m/%Y %H:%M') if r.enrolled_at else 'N/A' }}
             </td>
@@ -145,7 +140,7 @@
               {% if r.status == 'active' %}
                 <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: var(--success);">Đã kích hoạt</span>
               {% else %}
-                <span class="badge" style="background: rgba(99, 102, 241, 0.1); color: var(--primary);">Hoàn thành</span>
+                <span class="badge" style="background: rgba(37, 99, 235, 0.1); color: var(--primary);">Hoàn thành</span>
               {% endif %}
             </td>
           </tr>
@@ -161,11 +156,6 @@
 </div>
 
 <style>
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
-  70% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
-}
 @media (max-width: 768px) {
   .ketoan-sections {
     grid-template-columns: 1fr !important;
@@ -174,32 +164,26 @@
 </style>
 
 {% if revenue_growth %}
+<script nonce="{{ csp_nonce() }}" src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script nonce="{{ csp_nonce() }}">
   document.addEventListener("DOMContentLoaded", function() {
     const ctx = document.getElementById('revenueChart').getContext('2d');
-    
-    // Parse revenue growth data from Python
     const chartData = [
       {% for item in revenue_growth %}
         { date: "{{ item.date }}", amount: {{ item.amount }} },
       {% endfor %}
     ];
-    
+
     const labels = chartData.map(d => {
-      // Reformat label date to localized DD/MM
       const parts = d.date.split('-');
-      if (parts.length === 3) {
-        return parts[2] + '/' + parts[1];
-      }
-      return d.date;
+      return parts.length === 3 ? parts[2] + '/' + parts[1] : d.date;
     });
     const data = chartData.map(d => d.amount);
-    
-    // Create gradient background for the chart area
+
     const gradient = ctx.createLinearGradient(0, 0, 0, ctx.canvas.clientHeight);
-    gradient.addColorStop(0, 'rgba(16, 185, 129, 0.3)');
-    gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
-    
+    gradient.addColorStop(0, 'rgba(16, 185, 129, 0.24)');
+    gradient.addColorStop(1, 'rgba(16, 185, 129, 0)');
+
     new Chart(ctx, {
       type: 'line',
       data: {
@@ -211,7 +195,7 @@
           borderWidth: 3,
           backgroundColor: gradient,
           fill: true,
-          tension: 0.4,
+          tension: 0.36,
           pointBackgroundColor: '#10b981',
           pointHoverRadius: 7,
           pointRadius: 4
@@ -221,14 +205,12 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: {
-            display: false
-          },
+          legend: { display: false },
           tooltip: {
-            backgroundColor: 'rgba(5, 10, 31, 0.95)',
-            titleColor: '#94a3b8',
-            bodyColor: '#fff',
-            borderColor: 'rgba(143, 164, 255, 0.2)',
+            backgroundColor: '#111827',
+            titleColor: '#d1d5db',
+            bodyColor: '#ffffff',
+            borderColor: '#374151',
             borderWidth: 1,
             padding: 12,
             callbacks: {
@@ -240,31 +222,19 @@
         },
         scales: {
           x: {
-            grid: {
-              color: 'rgba(255, 255, 255, 0.03)'
-            },
+            grid: { color: '#eef2f7' },
             ticks: {
-              color: '#94a3b8',
-              font: {
-                family: 'Inter',
-                size: 10
-              }
+              color: '#667085',
+              font: { family: 'Plus Jakarta Sans', size: 10 }
             }
           },
           y: {
-            grid: {
-              color: 'rgba(255, 255, 255, 0.03)'
-            },
+            grid: { color: '#eef2f7' },
             ticks: {
-              color: '#94a3b8',
-              font: {
-                family: 'Inter',
-                size: 10
-              },
+              color: '#667085',
+              font: { family: 'Plus Jakarta Sans', size: 10 },
               callback: function(value) {
-                if (value >= 1000000) {
-                  return (value / 1000000) + 'M đ';
-                }
+                if (value >= 1000000) return (value / 1000000) + 'M đ';
                 return value.toLocaleString('vi-VN') + ' đ';
               }
             }
