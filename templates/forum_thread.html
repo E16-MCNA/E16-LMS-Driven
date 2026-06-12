@@ -2,8 +2,9 @@
 {% block content %}
 <header class="top-header">
   <div>
-    <a href="{{ url_for('communication.course_forum', course_id=course.id) }}" class="btn btn-outline btn-sm" style="margin-bottom: 12px;">&larr; Quay lại diễn đàn</a>
+    <a href="{{ url_for('communication.class_forum', course_id=course.id, class_id=course_class.id) }}" class="btn btn-outline btn-sm" style="margin-bottom: 12px;">&larr; Quay lại diễn đàn</a>
     <h1>Thảo luận</h1>
+    <p>{{ course_class.name }} · {{ course.title }}</p>
   </div>
   {% if current_user.role == 'teacher' and course.teacher_id == current_user.id %}
     <div class="actions">
@@ -15,51 +16,40 @@
   {% endif %}
 </header>
 
-<!-- Original Post -->
 <div class="card" style="margin-bottom: 32px; border-bottom: 4px solid var(--primary);">
   <div style="display: flex; gap: 20px; align-items: flex-start; margin-bottom: 24px;">
     <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.2rem;">{{ thread[1].email[0].upper() }}</div>
     <div style="flex-grow: 1;">
       <h2 style="margin-bottom: 4px;">{{ thread[0].title }}</h2>
       <div style="font-size: 0.85rem; color: var(--text-muted);">
-        Đăng bởi <strong>{{ thread[1].email.split('@')[0] }}</strong> • {{ thread[0].created_at.strftime('%d/%m/%Y %H:%M') }}
+        Đăng bởi <strong>{{ thread[1].email.split('@')[0] }}</strong> · {{ thread[0].created_at.strftime('%d/%m/%Y %H:%M') }}
       </div>
     </div>
-    <div>
-      <button onclick="openReportModal('{{ url_for('communication.report_thread', course_id=course.id, thread_id=thread[0].id) }}')" class="btn btn-outline btn-sm" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.4); background: transparent; padding: 4px 8px; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;">
-        ⚠️ <span>Báo cáo</span>
-      </button>
-    </div>
+    <button onclick="openReportModal('{{ url_for('communication.report_class_thread', course_id=course.id, class_id=course_class.id, thread_id=thread[0].id) }}')" class="btn btn-outline btn-sm" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.4);">Báo cáo</button>
   </div>
   <div style="font-size: 1.1rem; line-height: 1.7; white-space: pre-wrap;">{{ thread[0].body }}</div>
 </div>
 
-<!-- Replies -->
 <h3 style="margin-bottom: 24px;">Phản hồi ({{ replies|length }})</h3>
 <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 40px;">
   {% for reply, author in replies %}
-    <div class="card" style="background: rgba(255, 255, 255, 0.05);">
+    <div class="card" style="background: #f8fafc;">
       <div style="display: flex; gap: 16px; align-items: flex-start; margin-bottom: 12px;">
         <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--bg-soft); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem;">{{ author.email[0].upper() }}</div>
         <div style="flex-grow: 1; font-size: 0.9rem;">
-          <strong>{{ author.email.split('@')[0] }}</strong> 
+          <strong>{{ author.email.split('@')[0] }}</strong>
           <span style="color: var(--text-muted); margin-left: 8px;">{{ reply.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
         </div>
-        <div>
-          <button onclick="openReportModal('{{ url_for('communication.report_reply', course_id=course.id, reply_id=reply.id) }}')" class="btn btn-outline btn-sm" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.3); background: transparent; padding: 2px 6px; font-size: 0.75rem; display: flex; align-items: center; gap: 4px;">
-            ⚠️ <span>Báo cáo</span>
-          </button>
-        </div>
+        <button onclick="openReportModal('{{ url_for('communication.report_class_reply', course_id=course.id, class_id=course_class.id, reply_id=reply.id) }}')" class="btn btn-outline btn-sm" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.3);">Báo cáo</button>
       </div>
       <div style="line-height: 1.6; white-space: pre-wrap;">{{ reply.body }}</div>
     </div>
   {% endfor %}
 </div>
 
-<!-- Reply Form -->
 <div class="card">
   <h3 style="margin-bottom: 20px;">Gửi phản hồi</h3>
-  <form action="{{ url_for('communication.create_reply', course_id=course.id, thread_id=thread[0].id) }}" method="post" class="form-group">
+  <form action="{{ url_for('communication.create_reply', course_id=course.id, class_id=course_class.id, thread_id=thread[0].id) }}" method="post" class="form-group">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-group">
       <textarea name="body" rows="4" placeholder="Nhập nội dung phản hồi của bạn..." required></textarea>
@@ -68,57 +58,42 @@
   </form>
 </div>
 
-<!-- Modal Báo cáo -->
 <div id="reportModal" style="display: none; position: fixed; inset: 0; background: rgba(3, 6, 20, 0.85); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
-  <div class="card" style="width: 100%; max-width: 480px; border: 1px solid var(--card-border); background: var(--bg-soft); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5); padding: 24px;">
-    <h3 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px; color: var(--danger);">
-      ⚠️ Báo cáo nội dung vi phạm
-    </h3>
+  <div class="card" style="width: 100%; max-width: 480px; border: 1px solid var(--card-border); background: var(--card); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2); padding: 24px;">
+    <h3 style="margin-bottom: 16px; color: var(--danger);">Báo cáo nội dung vi phạm</h3>
     <form id="reportForm" method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      
       <div class="form-group" style="margin-bottom: 16px;">
-        <label for="reportReason" style="display: block; margin-bottom: 8px; font-size: 0.9rem; color: var(--text);">Lý do vi phạm</label>
-        <select name="reason" id="reportReason" required style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); color: var(--text);">
-          <option value="Spam / Quảng cáo" style="background: var(--bg-soft);">Spam / Quảng cáo</option>
-          <option value="Nội dung độc hại / Công kích" style="background: var(--bg-soft);">Nội dung độc hại / Công kích</option>
-          <option value="Vi phạm bản quyền / Đạo văn" style="background: var(--bg-soft);">Vi phạm bản quyền / Đạo văn</option>
-          <option value="Khác" style="background: var(--bg-soft);">Khác</option>
+        <label for="reportReason">Lý do vi phạm</label>
+        <select name="reason" id="reportReason" required>
+          <option value="Spam / Quảng cáo">Spam / Quảng cáo</option>
+          <option value="Nội dung độc hại / Công kích">Nội dung độc hại / Công kích</option>
+          <option value="Vi phạm bản quyền / Đạo văn">Vi phạm bản quyền / Đạo văn</option>
+          <option value="Khác">Khác</option>
         </select>
       </div>
-
       <div class="form-group" style="margin-bottom: 24px;">
-        <label for="reportDetail" style="display: block; margin-bottom: 8px; font-size: 0.9rem; color: var(--text);">Chi tiết báo cáo (Không bắt buộc)</label>
-        <textarea name="detail" id="reportDetail" rows="3" placeholder="Nhập thêm thông tin chi tiết..." style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); color: var(--text); resize: vertical;"></textarea>
+        <label for="reportDetail">Chi tiết báo cáo</label>
+        <textarea name="detail" id="reportDetail" rows="3"></textarea>
       </div>
-
       <div style="display: flex; justify-content: flex-end; gap: 12px;">
-        <button type="button" onclick="closeReportModal()" class="btn btn-outline" style="padding: 10px 16px;">Hủy bỏ</button>
-        <button type="submit" class="btn btn-primary" style="background: var(--danger); border-color: var(--danger); padding: 10px 16px;">Gửi báo cáo</button>
+        <button type="button" onclick="closeReportModal()" class="btn btn-outline">Hủy</button>
+        <button type="submit" class="btn btn-primary" style="background: var(--danger); border-color: var(--danger);">Gửi báo cáo</button>
       </div>
     </form>
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 function openReportModal(actionUrl) {
   const modal = document.getElementById('reportModal');
   const form = document.getElementById('reportForm');
   form.action = actionUrl;
   modal.style.display = 'flex';
 }
-
 function closeReportModal() {
-  const modal = document.getElementById('reportModal');
-  modal.style.display = 'none';
+  document.getElementById('reportModal').style.display = 'none';
   document.getElementById('reportForm').reset();
-}
-
-window.onclick = function(event) {
-  const modal = document.getElementById('reportModal');
-  if (event.target == modal) {
-    closeReportModal();
-  }
 }
 </script>
 {% endblock %}

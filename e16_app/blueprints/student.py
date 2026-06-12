@@ -8,11 +8,18 @@ from sqlalchemy import func
 
 from ..auth_utils import login_required, role_required
 from ..extensions import db
-from ..models import Category, Course, Enrollment, LearningLog, Lesson, Quiz, Question, Choice, QuizAttempt, QuizAnswer, Assignment, Submission, Certificate, User
+from ..models import Category, ClassSession, Course, Enrollment, LearningLog, Lesson, Quiz, Question, Choice, QuizAttempt, QuizAnswer, Assignment, Submission, Certificate, User
 from ..services.logging import logger
 from ..time_utils import ensure_utc, utcnow
 
 bp = Blueprint("student", __name__)
+
+
+def _safe_int(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _mask_email(email: str) -> str:
@@ -759,6 +766,20 @@ def view_transcript():
 @login_required
 @role_required("student")
 def view_calendar():
+    week_offset = _safe_int(request.args.get("week"), 0)
+    today = utcnow().date()
+    week_start_date = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
+    week_end_date = week_start_date + timedelta(days=7)
+    week_start = ensure_utc(utcnow().replace(
+        year=week_start_date.year,
+        month=week_start_date.month,
+        day=week_start_date.day,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    ))
+    week_end = week_start + timedelta(days=7)
     deadlines = []
     enrollments = db.session.query(Enrollment).filter(
         Enrollment.user_id == current_user.id,
@@ -772,9 +793,28 @@ def view_calendar():
 
         quizzes = db.session.query(Quiz).filter_by(course_id=course.id, is_published=True).all()
         assignments = db.session.query(Assignment).filter_by(course_id=course.id).all()
+        if en.class_id:
+            sessions = (
+                db.session.query(ClassSession)
+                .filter(
+                    ClassSession.class_id == en.class_id,
+                    ClassSession.starts_at != None,
+                    ClassSession.starts_at >= week_start,
+                    ClassSession.starts_at < week_end,
+                )
+                .all()
+            )
+            for class_session in sessions:
+                deadlines.append({
+                    "deadline": class_session.starts_at,
+                    "type": "Buổi học",
+                    "title": class_session.title,
+                    "course": course.title,
+                    "status": class_session.status,
+                })
 
         for quiz in quizzes:
-            if quiz.due_date:
+            if quiz.due_date and week_start <= ensure_utc(quiz.due_date) < week_end:
                 has_attempts = db.session.query(QuizAttempt).filter_by(
                     user_id=current_user.id,
                     quiz_id=quiz.id
@@ -789,7 +829,7 @@ def view_calendar():
                 })
 
         for assignment in assignments:
-            if assignment.deadline:
+            if assignment.deadline and week_start <= ensure_utc(assignment.deadline) < week_end:
                 submission = db.session.query(Submission).filter_by(
                     user_id=current_user.id,
                     assignment_id=assignment.id
@@ -812,7 +852,15 @@ def view_calendar():
                 })
 
     deadlines.sort(key=lambda x: x["deadline"])
-    return render_template("calendar.html", deadlines=deadlines)
+    return render_template(
+        "calendar.html",
+        deadlines=deadlines,
+        week_offset=week_offset,
+        prev_week=week_offset - 1,
+        next_week=week_offset + 1,
+        week_start=week_start,
+        week_end=week_end - timedelta(seconds=1),
+    )
 
 
 def _calc_streak(user_id):

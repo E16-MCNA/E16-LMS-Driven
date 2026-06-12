@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="top-header">
+  <div>
+    <a href="{{ url_for('teacher.dashboard') }}" class="btn btn-outline btn-sm" style="margin-bottom: 12px;">&larr; Dashboard</a>
+    <h1>Co van hoc tap</h1>
+    <p>Theo doi cac lop duoc gan cho teacher nay, gom hoc vien, buoi hoc va diem can chu y.</p>
+  </div>
+  <span class="status-pill">{{ rows|length }} lop</span>
+</header>
+
+<section class="panel">
+  <div class="panel-header">
+    <div>
+      <h2>Lop dang co van</h2>
+      <p>Mo tung lop de xem danh sach hoc vien va tom tat diem danh.</p>
+    </div>
+  </div>
+
+  {% if rows %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Lop</th>
+            <th>Khoa hoc</th>
+            <th>Hoc vien</th>
+            <th>Buoi hoc</th>
+            <th>Can chu y</th>
+            <th>Thao tac</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for course_class, course in rows %}
+            <tr>
+              <td style="font-weight: 700;">{{ course_class.name }}</td>
+              <td>{{ course.title }}</td>
+              <td>{{ student_counts.get(course_class.id, 0) }}</td>
+              <td>{{ session_counts.get(course_class.id, 0) }}</td>
+              <td>
+                {% set attention = attention_counts.get(course_class.id, 0) %}
+                <span class="status-pill {% if attention %}status-rejected{% else %}status-published{% endif %}">{{ attention }}</span>
+              </td>
+              <td>
+                <a href="{{ url_for('teacher.advisor_class_detail', class_id=course_class.id) }}" class="btn btn-primary btn-sm">Chi tiet</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state compact">Chua co lop nao duoc gan co van.</div>
+  {% endif %}
+</section>
+{% endblock %}

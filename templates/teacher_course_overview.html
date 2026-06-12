@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="top-header">
+  <div>
+    <a href="{{ url_for('teacher.manage_courses') }}" class="btn btn-outline btn-sm" style="margin-bottom: 12px;">&larr; Quay lại khóa học</a>
+    <h1>{{ course.title }}</h1>
+    <p>Quản lý lớp học, bài tập và trạng thái vận hành của khóa học.</p>
+  </div>
+  <span class="status-pill status-{{ course.status }}">{{ course.status|replace('_', ' ')|title }}</span>
+</header>
+
+{% include "course_subnav.html" %}
+
+<div class="kpi-grid">
+  <div class="metric-card">
+    <span class="metric-label">Trạng thái</span>
+    <strong>{{ course.status|replace('_', ' ')|title }}</strong>
+  </div>
+  <div class="metric-card">
+    <span class="metric-label">Lớp học</span>
+    <strong>{{ classes|length }}</strong>
+  </div>
+  <div class="metric-card">
+    <span class="metric-label">Học viên active</span>
+    <strong>{{ active_students }}</strong>
+  </div>
+  <div class="metric-card">
+    <span class="metric-label">Bài tập</span>
+    <strong>{{ assignments|length }}</strong>
+  </div>
+</div>
+
+<div class="grid-2">
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Danh sách lớp học</h2>
+        <p>Bấm vào từng lớp để quản lý các buổi học.</p>
+      </div>
+    </div>
+
+    <form action="{{ url_for('teacher.create_course_class', course_id=course.id) }}" method="post" class="form-group" style="margin-bottom: 20px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="class-name">Tạo lớp học mới</label>
+      <div style="display: flex; gap: 8px;">
+        <input id="class-name" type="text" name="name" placeholder="VD: Lớp Python tối thứ 3" required>
+        <button type="submit" class="btn btn-primary">Tạo lớp</button>
+      </div>
+    </form>
+
+    {% if classes %}
+      <div class="task-list">
+        {% for cls in classes %}
+          <a class="task-item" href="{{ url_for('teacher.class_detail', course_id=course.id, class_id=cls.id) }}">
+            <div>
+              <strong>{{ cls.name }}</strong>
+              <small>{{ session_counts.get(cls.id, 0) }} buổi học · {{ cls.status|title }}</small>
+            </div>
+            <span class="status-pill">Mở</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state compact">Chưa có lớp học nào cho khóa này.</div>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Danh sách bài tập</h2>
+        <p>Các bài tập thuộc khóa học này.</p>
+      </div>
+      <a href="{{ url_for('teacher.manage_assignments', course_id=course.id) }}" class="btn btn-outline btn-sm">Quản lý</a>
+    </div>
+
+    {% if assignments %}
+      <div class="task-list">
+        {% for assignment in assignments %}
+          <a class="task-item" href="{{ url_for('teacher.view_submissions', assignment_id=assignment.id) }}">
+            <div>
+              <strong>{{ assignment.title }}</strong>
+              <small>{% if assignment.deadline %}Hạn: {{ assignment.deadline.strftime('%d/%m/%Y %H:%M') }}{% else %}Chưa đặt hạn{% endif %}</small>
+            </div>
+            <span class="task-type">Bài tập</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state compact">Chưa có bài tập nào.</div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

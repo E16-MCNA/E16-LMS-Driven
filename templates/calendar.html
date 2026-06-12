@@ -3,81 +3,35 @@
 <header class="top-header">
   <div>
     <h1>Lịch học tập & Deadline</h1>
-    <p>Theo dõi các mốc thời gian quan trọng để sắp xếp thời gian làm bài hiệu quả.</p>
+    <p>Theo dõi buổi học, quiz và bài tập theo từng tuần.</p>
+  </div>
+  <div class="actions">
+    <a href="{{ url_for('student.view_calendar', week=prev_week) }}" class="btn btn-outline">&larr; Tuần trước</a>
+    <span class="status-pill">{{ week_start.strftime('%d/%m') }} - {{ week_end.strftime('%d/%m/%Y') }}</span>
+    <a href="{{ url_for('student.view_calendar', week=next_week) }}" class="btn btn-outline">Tuần sau &rarr;</a>
   </div>
 </header>
 
 <div style="max-width: 900px; margin: 0 auto;">
   {% if deadlines %}
-    <div style="position: relative; padding-left: 32px; border-left: 2px dashed rgba(99, 102, 241, 0.2); margin-left: 16px;">
-      {% set current_date = None %}
+    <div class="task-list">
       {% for item in deadlines %}
-        {% set item_date = item.deadline.strftime('%d/%m/%Y') %}
-        
-        {% if item_date != current_date %}
-          <!-- Date Header Node -->
-          <div style="position: relative; margin-top: 40px; margin-bottom: 20px;">
-            <div style="position: absolute; left: -44px; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: var(--bg); border: 4px solid var(--primary); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px var(--primary-glow);"></div>
-            <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 8px; margin: 0;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="opacity: 0.8;">
-                <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/>
-              </svg>
-              {{ item_date }}
-            </h3>
-          </div>
-        {% endif %}
-        
-        {% set current_date = item_date %}
-        
-        <!-- Timeline Card -->
-        <div class="card" style="padding: 20px; margin-bottom: 16px; transition: var(--transition); position: relative; overflow: hidden;">
-          <!-- Highlight bar on the left of card based on type -->
-          <div style="position: absolute; top: 0; left: 0; bottom: 0; width: 4px; background: {% if item.type == 'Quiz' %}var(--warning){% else %}var(--primary){% endif %};"></div>
-          
-          <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap;">
-            <div style="display: flex; gap: 16px; align-items: center;">
-              <!-- Time Block -->
-              <div style="background: rgba(255, 255, 255, 0.05); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--card-border); text-align: center; min-width: 70px;">
-                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; margin-bottom: 2px;">Giờ</div>
-                <div style="font-weight: 800; font-size: 1.1rem; color: #fff;">{{ item.deadline.strftime('%H:%M') }}</div>
-              </div>
-              
-              <!-- Content Block -->
-              <div>
-                <h4 style="font-size: 1.1rem; font-weight: 700; margin: 0 0 6px 0; color: #fff;">{{ item.title }}</h4>
-                <div style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
-                  <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, 0.3);"></span>
-                  Khóa học: {{ item.course }}
-                </div>
-              </div>
+        <div class="task-item wide">
+          <div style="display: flex; justify-content: space-between; gap: 16px; align-items: center; flex-wrap: wrap;">
+            <div>
+              <span class="task-type">{{ item.type }}</span>
+              <strong>{{ item.title }}</strong>
+              <small>{{ item.course }} · {{ item.deadline.strftime('%d/%m/%Y %H:%M') }}</small>
             </div>
-            
-            <!-- Badges and Actions -->
-            <div style="display: flex; align-items: center; gap: 16px;">
-              <!-- Type Pill -->
-              <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 12px; border-radius: 20px; 
-                           background: {% if item.type == 'Quiz' %}rgba(245, 158, 11, 0.15); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2);{% else %}rgba(99, 102, 241, 0.15); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.2);{% endif %};">
-                {{ item.type }}
-              </span>
-              
-              <!-- Status Badge -->
-              {% set clean_status = item.status|string|lower %}
-              <span style="font-size: 0.8rem; font-weight: 600; padding: 6px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;
-                           background: {% if 'graded' in clean_status or 'đã làm' in clean_status or 'hoàn thành' in clean_status %}rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);
-                                       {% else %}rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2);{% endif %};">
-                <span style="width: 6px; height: 6px; border-radius: 50%; background: {% if 'graded' in clean_status or 'đã làm' in clean_status or 'hoàn thành' in clean_status %}var(--success){% else %}var(--danger){% endif %};"></span>
-                {{ item.status }}
-              </span>
-            </div>
+            <span class="status-pill">{{ item.status }}</span>
           </div>
         </div>
       {% endfor %}
     </div>
   {% else %}
     <div class="card" style="text-align: center; padding: 48px 24px;">
-      <div style="font-size: 3rem; margin-bottom: 16px;">📅</div>
-      <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 8px;">Không có deadline nào</h3>
-      <p style="color: var(--text-muted); margin: 0;">Tuyệt vời! Bạn đã hoàn thành xuất sắc tất cả các mốc học tập sắp tới.</p>
+      <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 8px;">Không có lịch trong tuần này</h3>
+      <p style="color: var(--text-muted); margin: 0;">Dùng mũi tên để xem tuần trước hoặc tuần sau.</p>
     </div>
   {% endif %}
 </div>

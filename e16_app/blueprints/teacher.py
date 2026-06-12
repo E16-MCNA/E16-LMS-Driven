@@ -4,11 +4,26 @@ import io
 import os
 from flask import Blueprint, flash, redirect, render_template, request, url_for, make_response, jsonify, abort
 from flask_login import current_user
-from sqlalchemy import func
+from sqlalchemy import case, func, or_
 
 from ..auth_utils import login_required, role_required
 from ..extensions import db
-from ..models import Course, Enrollment, Lesson, Quiz, Question, Choice, Assignment, Submission, User, QuizAttempt
+from ..models import (
+    AttendanceRecord,
+    ClassSession,
+    ClassSessionLesson,
+    Course,
+    CourseClass,
+    Enrollment,
+    Lesson,
+    Quiz,
+    Question,
+    Choice,
+    Assignment,
+    Submission,
+    User,
+    QuizAttempt,
+)
 from ..pagination import get_pagination, paginate_query
 from ..services.audit import log_action
 from ..services.course import recalc_total_lessons
@@ -26,6 +41,47 @@ def _safe_int(val, default=0):
         return int(val) if val is not None and str(val).strip() != "" else default
     except (ValueError, TypeError):
         return default
+
+
+def _teacher_course_or_redirect(course_id):
+    course = db.session.get(Course, course_id)
+    if not course or course.teacher_id != current_user.id or course.is_deleted:
+        return None
+    return course
+
+
+def _teacher_class_or_redirect(course_id, class_id):
+    course = _teacher_course_or_redirect(course_id)
+    if not course:
+        return None, None
+    course_class = db.session.get(CourseClass, class_id)
+    if not course_class or course_class.course_id != course.id:
+        return course, None
+    return course, course_class
+
+
+def _teacher_session_or_redirect(course_id, class_id, session_id):
+    course, course_class = _teacher_class_or_redirect(course_id, class_id)
+    if not course or not course_class:
+        return course, course_class, None
+    class_session = db.session.get(ClassSession, session_id)
+    if not class_session or class_session.class_id != course_class.id:
+        return course, course_class, None
+    return course, course_class, class_session
+
+
+def _advisor_class_or_redirect(class_id):
+    result = (
+        db.session.query(CourseClass, Course)
+        .join(Course, Course.id == CourseClass.course_id)
+        .filter(
+            CourseClass.id == class_id,
+            Course.is_deleted == False,
+            or_(CourseClass.advisor_id == current_user.id, Course.teacher_id == current_user.id),
+        )
+        .first()
+    )
+    return result if result else (None, None)
 
 
 @bp.route("/dashboard")
@@ -62,6 +118,15 @@ def dashboard():
         
     pending_review_count = len([c for c in courses if c.status == "pending_review"])
     draft_count = len([c for c in courses if c.status == "draft"])
+    advisor_classes_count = (
+        db.session.query(CourseClass)
+        .join(Course, Course.id == CourseClass.course_id)
+        .filter(
+            Course.is_deleted == False,
+            or_(CourseClass.advisor_id == current_user.id, Course.teacher_id == current_user.id),
+        )
+        .count()
+    )
 
     return render_template("teacher_dashboard.html", 
                            courses=courses[:5], 
@@ -71,7 +136,8 @@ def dashboard():
                            pending_submissions=pending_submissions,
                            recent_submissions=recent_submissions,
                            pending_review_count=pending_review_count,
-                           draft_count=draft_count)
+                           draft_count=draft_count,
+                           advisor_classes_count=advisor_classes_count)
 
 @bp.route("/manage")
 @login_required
@@ -79,6 +145,368 @@ def dashboard():
 def manage_courses():
     courses = db.session.query(Course).filter(Course.teacher_id == current_user.id, Course.is_deleted == False).all()
     return render_template("manage_courses.html", courses=courses)
+
+
+@bp.route("/advisor")
+@login_required
+@role_required("teacher")
+def advisor_dashboard():
+    rows = (
+        db.session.query(CourseClass, Course)
+        .join(Course, Course.id == CourseClass.course_id)
+        .filter(
+            Course.is_deleted == False,
+            or_(CourseClass.advisor_id == current_user.id, Course.teacher_id == current_user.id),
+        )
+        .order_by(Course.title.asc(), CourseClass.name.asc())
+        .all()
+    )
+    class_ids = [course_class.id for course_class, _course in rows]
+    student_counts = {}
+    session_counts = {}
+    attention_counts = {}
+    if class_ids:
+        student_counts = {
+            class_id: count
+            for class_id, count in (
+                db.session.query(Enrollment.class_id, func.count(Enrollment.id))
+                .filter(Enrollment.class_id.in_(class_ids), Enrollment.status.in_(["active", "completed"]))
+                .group_by(Enrollment.class_id)
+                .all()
+            )
+        }
+        session_counts = {
+            class_id: count
+            for class_id, count in (
+                db.session.query(ClassSession.class_id, func.count(ClassSession.id))
+                .filter(ClassSession.class_id.in_(class_ids))
+                .group_by(ClassSession.class_id)
+                .all()
+            )
+        }
+        attention_counts = {
+            class_id: count
+            for class_id, count in (
+                db.session.query(ClassSession.class_id, func.count(AttendanceRecord.id))
+                .join(AttendanceRecord, AttendanceRecord.session_id == ClassSession.id)
+                .filter(ClassSession.class_id.in_(class_ids), AttendanceRecord.status.in_(["absent", "late"]))
+                .group_by(ClassSession.class_id)
+                .all()
+            )
+        }
+
+    return render_template(
+        "teacher_advisor_dashboard.html",
+        rows=rows,
+        student_counts=student_counts,
+        session_counts=session_counts,
+        attention_counts=attention_counts,
+    )
+
+
+@bp.route("/advisor/classes/<class_id>")
+@login_required
+@role_required("teacher")
+def advisor_class_detail(class_id):
+    course_class, course = _advisor_class_or_redirect(class_id)
+    if not course_class:
+        return redirect(url_for("teacher.advisor_dashboard"))
+
+    enrollments = (
+        db.session.query(Enrollment, User)
+        .join(User, User.id == Enrollment.user_id)
+        .filter(Enrollment.class_id == course_class.id, Enrollment.status.in_(["active", "completed"]))
+        .order_by(User.email.asc())
+        .all()
+    )
+    sessions = (
+        db.session.query(ClassSession)
+        .filter(ClassSession.class_id == course_class.id)
+        .order_by(ClassSession.starts_at.desc().nullslast(), ClassSession.created_at.desc())
+        .all()
+    )
+    user_ids = [user.id for _enrollment, user in enrollments]
+    attendance_summary = {}
+    if user_ids:
+        attendance_summary = {
+            user_id: {"present": present or 0, "late": late or 0, "absent": absent or 0, "excused": excused or 0}
+            for user_id, present, late, absent, excused in (
+                db.session.query(
+                    AttendanceRecord.user_id,
+                    func.sum(case((AttendanceRecord.status == "present", 1), else_=0)),
+                    func.sum(case((AttendanceRecord.status == "late", 1), else_=0)),
+                    func.sum(case((AttendanceRecord.status == "absent", 1), else_=0)),
+                    func.sum(case((AttendanceRecord.status == "excused", 1), else_=0)),
+                )
+                .join(ClassSession, ClassSession.id == AttendanceRecord.session_id)
+                .filter(ClassSession.class_id == course_class.id, AttendanceRecord.user_id.in_(user_ids))
+                .group_by(AttendanceRecord.user_id)
+                .all()
+            )
+        }
+
+    return render_template(
+        "teacher_advisor_class.html",
+        course=course,
+        course_class=course_class,
+        enrollments=enrollments,
+        sessions=sessions,
+        attendance_summary=attendance_summary,
+    )
+
+
+@bp.route("/courses/<course_id>")
+@login_required
+@role_required("teacher")
+def course_overview(course_id):
+    course = _teacher_course_or_redirect(course_id)
+    if not course:
+        return redirect(url_for("teacher.manage_courses"))
+
+    classes = (
+        db.session.query(CourseClass)
+        .filter(CourseClass.course_id == course.id)
+        .order_by(CourseClass.created_at.desc())
+        .all()
+    )
+    assignments = (
+        db.session.query(Assignment)
+        .filter(Assignment.course_id == course.id)
+        .order_by(Assignment.created_at.desc())
+        .all()
+    )
+    active_students = (
+        db.session.query(Enrollment)
+        .filter(Enrollment.course_id == course.id, Enrollment.status.in_(["active", "completed"]))
+        .count()
+    )
+    session_counts = {}
+    if classes:
+        rows = (
+            db.session.query(ClassSession.class_id, func.count(ClassSession.id))
+            .filter(ClassSession.class_id.in_([c.id for c in classes]))
+            .group_by(ClassSession.class_id)
+            .all()
+        )
+        session_counts = {class_id: count for class_id, count in rows}
+
+    return render_template(
+        "teacher_course_overview.html",
+        course=course,
+        classes=classes,
+        assignments=assignments,
+        active_students=active_students,
+        session_counts=session_counts,
+    )
+
+
+@bp.post("/courses/<course_id>/classes/new")
+@login_required
+@role_required("teacher")
+def create_course_class(course_id):
+    course = _teacher_course_or_redirect(course_id)
+    if not course:
+        return redirect(url_for("teacher.manage_courses"))
+
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        flash("Tên lớp học không được để trống.", "error")
+        return redirect(url_for("teacher.course_overview", course_id=course.id))
+
+    course_class = CourseClass(
+        course_id=course.id,
+        advisor_id=current_user.id,
+        name=name,
+        status=request.form.get("status") or "active",
+    )
+    db.session.add(course_class)
+    db.session.commit()
+    log_action("course_class_created", "CourseClass", course_class.id, {"course_id": course.id, "name": name})
+    flash("Đã tạo lớp học.", "success")
+    return redirect(url_for("teacher.course_overview", course_id=course.id))
+
+
+@bp.route("/courses/<course_id>/classes/<class_id>")
+@login_required
+@role_required("teacher")
+def class_detail(course_id, class_id):
+    course, course_class = _teacher_class_or_redirect(course_id, class_id)
+    if not course:
+        return redirect(url_for("teacher.manage_courses"))
+    if not course_class:
+        return redirect(url_for("teacher.course_overview", course_id=course.id))
+
+    sessions = (
+        db.session.query(ClassSession)
+        .filter(ClassSession.class_id == course_class.id)
+        .order_by(ClassSession.starts_at.asc().nullslast(), ClassSession.created_at.asc())
+        .all()
+    )
+    student_count = (
+        db.session.query(Enrollment)
+        .filter(Enrollment.course_id == course.id, Enrollment.class_id == course_class.id, Enrollment.status.in_(["active", "completed"]))
+        .count()
+    )
+    return render_template(
+        "teacher_class_detail.html",
+        course=course,
+        course_class=course_class,
+        sessions=sessions,
+        student_count=student_count,
+    )
+
+
+@bp.post("/courses/<course_id>/classes/<class_id>/sessions/new")
+@login_required
+@role_required("teacher")
+def create_class_session(course_id, class_id):
+    course, course_class = _teacher_class_or_redirect(course_id, class_id)
+    if not course:
+        return redirect(url_for("teacher.manage_courses"))
+    if not course_class:
+        return redirect(url_for("teacher.course_overview", course_id=course.id))
+
+    title = (request.form.get("title") or "").strip()
+    if not title:
+        flash("Tên buổi học không được để trống.", "error")
+        return redirect(url_for("teacher.class_detail", course_id=course.id, class_id=course_class.id))
+
+    class_session = ClassSession(
+        class_id=course_class.id,
+        title=title,
+        starts_at=parse_datetime_utc(request.form.get("starts_at")),
+        status=request.form.get("status") or "scheduled",
+        notes=(request.form.get("notes") or "").strip(),
+    )
+    db.session.add(class_session)
+    db.session.commit()
+    log_action("class_session_created", "ClassSession", class_session.id, {"class_id": course_class.id, "title": title})
+    flash("Đã tạo buổi học.", "success")
+    return redirect(url_for("teacher.class_detail", course_id=course.id, class_id=course_class.id))
+
+
+@bp.route("/courses/<course_id>/classes/<class_id>/sessions/<session_id>")
+@login_required
+@role_required("teacher")
+def class_session_detail(course_id, class_id, session_id):
+    course, course_class, class_session = _teacher_session_or_redirect(course_id, class_id, session_id)
+    if not course:
+        return redirect(url_for("teacher.manage_courses"))
+    if not course_class:
+        return redirect(url_for("teacher.course_overview", course_id=course.id))
+    if not class_session:
+        return redirect(url_for("teacher.class_detail", course_id=course.id, class_id=course_class.id))
+
+    lesson_links = (
+        db.session.query(ClassSessionLesson)
+        .filter(ClassSessionLesson.session_id == class_session.id)
+        .order_by(ClassSessionLesson.sequence_order.asc())
+        .all()
+    )
+    linked_lesson_ids = {link.lesson_id for link in lesson_links}
+    available_lessons = (
+        db.session.query(Lesson)
+        .filter(Lesson.course_id == course.id, ~Lesson.id.in_(linked_lesson_ids))
+        .order_by(Lesson.sequence_order.asc())
+        .all()
+        if linked_lesson_ids
+        else db.session.query(Lesson).filter(Lesson.course_id == course.id).order_by(Lesson.sequence_order.asc()).all()
+    )
+    enrollments = (
+        db.session.query(Enrollment, User)
+        .join(User, User.id == Enrollment.user_id)
+        .filter(Enrollment.course_id == course.id, Enrollment.class_id == course_class.id, Enrollment.status.in_(["active", "completed"]))
+        .order_by(User.email.asc())
+        .all()
+    )
+    attendance_rows = db.session.query(AttendanceRecord).filter(AttendanceRecord.session_id == class_session.id).all()
+    attendance_map = {row.user_id: row for row in attendance_rows}
+
+    return render_template(
+        "teacher_class_session.html",
+        course=course,
+        course_class=course_class,
+        class_session=class_session,
+        lesson_links=lesson_links,
+        available_lessons=available_lessons,
+        enrollments=enrollments,
+        attendance_map=attendance_map,
+    )
+
+
+@bp.post("/courses/<course_id>/classes/<class_id>/sessions/<session_id>/lessons/add")
+@login_required
+@role_required("teacher")
+def add_session_lesson(course_id, class_id, session_id):
+    course, course_class, class_session = _teacher_session_or_redirect(course_id, class_id, session_id)
+    if not course or not course_class or not class_session:
+        return redirect(url_for("teacher.manage_courses"))
+
+    lesson_id = request.form.get("lesson_id")
+    lesson = db.session.get(Lesson, lesson_id)
+    if not lesson or lesson.course_id != course.id:
+        flash("Bài học không hợp lệ.", "error")
+        return redirect(url_for("teacher.class_session_detail", course_id=course.id, class_id=course_class.id, session_id=class_session.id))
+
+    exists = db.session.query(ClassSessionLesson).filter_by(session_id=class_session.id, lesson_id=lesson.id).first()
+    if not exists:
+        last_link = (
+            db.session.query(ClassSessionLesson)
+            .filter_by(session_id=class_session.id)
+            .order_by(ClassSessionLesson.sequence_order.desc())
+            .first()
+        )
+        next_order = (last_link.sequence_order + 1) if last_link else 1
+        db.session.add(ClassSessionLesson(session_id=class_session.id, lesson_id=lesson.id, sequence_order=next_order))
+        db.session.commit()
+        flash("Đã thêm bài học vào buổi học.", "success")
+    return redirect(url_for("teacher.class_session_detail", course_id=course.id, class_id=course_class.id, session_id=class_session.id))
+
+
+@bp.post("/courses/<course_id>/classes/<class_id>/sessions/<session_id>/attendance")
+@login_required
+@role_required("teacher")
+def update_attendance(course_id, class_id, session_id):
+    course, course_class, class_session = _teacher_session_or_redirect(course_id, class_id, session_id)
+    if not course or not course_class or not class_session:
+        return redirect(url_for("teacher.manage_courses"))
+
+    enrollments = (
+        db.session.query(Enrollment)
+        .filter(Enrollment.course_id == course.id, Enrollment.class_id == course_class.id, Enrollment.status.in_(["active", "completed"]))
+        .all()
+    )
+    valid_user_ids = {en.user_id for en in enrollments}
+    existing = {
+        row.user_id: row
+        for row in db.session.query(AttendanceRecord).filter(AttendanceRecord.session_id == class_session.id).all()
+    }
+    allowed_statuses = {"present", "late", "absent", "excused"}
+    for user_id in valid_user_ids:
+        status = request.form.get(f"attendance_{user_id}", "absent")
+        if status not in allowed_statuses:
+            status = "absent"
+        note = (request.form.get(f"note_{user_id}") or "").strip()
+        row = existing.get(user_id)
+        if row:
+            row.status = status
+            row.note = note
+            row.marked_at = utcnow()
+            row.marked_by = current_user.id
+        else:
+            db.session.add(
+                AttendanceRecord(
+                    session_id=class_session.id,
+                    user_id=user_id,
+                    status=status,
+                    note=note,
+                    marked_by=current_user.id,
+                )
+            )
+    db.session.commit()
+    log_action("attendance_updated", "ClassSession", class_session.id, {"course_id": course.id, "class_id": course_class.id})
+    flash("Đã cập nhật điểm danh.", "success")
+    return redirect(url_for("teacher.class_session_detail", course_id=course.id, class_id=course_class.id, session_id=class_session.id))
 
 
 @bp.post("/courses/new")

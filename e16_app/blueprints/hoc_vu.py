@@ -22,7 +22,7 @@ from sqlalchemy import case, func
 from ..auth_utils import login_required, role_required
 from ..extensions import db
 from ..models import (
-    VALID_ROLES, Course, Enrollment, User,
+    VALID_ROLES, Course, CourseClass, Enrollment, User,
 )
 from ..pagination import get_pagination, paginate_query
 from ..services.audit import log_action
@@ -120,6 +120,91 @@ def pending_courses():
         .all()
     )
     return render_template("hocvu_pending_courses.html", courses=courses)
+
+
+@bp.route("/class-placement")
+@login_required
+@role_required("hoc_vu", "admin")
+def class_placement():
+    pending_enrollments = (
+        db.session.query(Enrollment, User, Course)
+        .join(User, User.id == Enrollment.user_id)
+        .join(Course, Course.id == Enrollment.course_id)
+        .filter(
+            Enrollment.status.in_(["active", "completed"]),
+            Enrollment.class_id == None,
+            Course.is_deleted == False,
+        )
+        .order_by(Enrollment.enrolled_at.desc())
+        .all()
+    )
+    classes = (
+        db.session.query(CourseClass, Course)
+        .join(Course, Course.id == CourseClass.course_id)
+        .filter(Course.is_deleted == False)
+        .order_by(Course.title.asc(), CourseClass.name.asc())
+        .all()
+    )
+    courses = (
+        db.session.query(Course)
+        .filter(Course.status.in_(["published", "running"]), Course.is_deleted == False)
+        .order_by(Course.title.asc())
+        .all()
+    )
+    teachers = db.session.query(User).filter(User.role == "teacher").order_by(User.email.asc()).all()
+    classes_by_course = {}
+    for course_class, course in classes:
+        classes_by_course.setdefault(course.id, []).append(course_class)
+    return render_template(
+        "hocvu_class_placement.html",
+        pending_enrollments=pending_enrollments,
+        courses=courses,
+        teachers=teachers,
+        classes_by_course=classes_by_course,
+    )
+
+
+@bp.post("/classes/new")
+@login_required
+@role_required("hoc_vu", "admin")
+def create_course_class():
+    course_id = request.form.get("course_id")
+    course = db.session.get(Course, course_id)
+    name = (request.form.get("name") or "").strip()
+    if not course or course.is_deleted or not name:
+        flash("Thông tin lớp học không hợp lệ.", "error")
+        return redirect(url_for("hoc_vu.class_placement"))
+
+    advisor_id = request.form.get("advisor_id") or course.teacher_id
+    advisor = db.session.get(User, advisor_id) if advisor_id else None
+    course_class = CourseClass(
+        course_id=course.id,
+        advisor_id=advisor.id if advisor and advisor.role == "teacher" else course.teacher_id,
+        name=name,
+        status=request.form.get("status") or "active",
+    )
+    db.session.add(course_class)
+    db.session.commit()
+    log_action("course_class_created_by_hoc_vu", "CourseClass", course_class.id, {"course_id": course.id, "name": name})
+    flash("Đã tạo lớp học.", "success")
+    return redirect(url_for("hoc_vu.class_placement"))
+
+
+@bp.post("/enrollments/<enrollment_id>/assign-class")
+@login_required
+@role_required("hoc_vu", "admin")
+def assign_enrollment_class(enrollment_id):
+    enrollment = db.session.get(Enrollment, enrollment_id)
+    course_class = db.session.get(CourseClass, request.form.get("class_id"))
+    if not enrollment or not course_class or course_class.course_id != enrollment.course_id:
+        flash("Không thể xếp lớp cho học viên này.", "error")
+        return redirect(url_for("hoc_vu.class_placement"))
+
+    enrollment.class_id = course_class.id
+    db.session.commit()
+    log_action("enrollment_class_assigned", "Enrollment", enrollment.id, {"class_id": course_class.id})
+    flash("Đã xếp học viên vào lớp.", "success")
+    return redirect(url_for("hoc_vu.class_placement"))
 
 
 @bp.route("/courses/<course_id>/review", methods=["POST"])

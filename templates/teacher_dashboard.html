@@ -32,6 +32,10 @@
     <span class="metric-label">Bài cần chấm</span>
     <strong>{{ pending_submissions }}</strong>
   </div>
+  <a class="metric-card" href="{{ url_for('teacher.advisor_dashboard') }}">
+    <span class="metric-label">Co van hoc tap</span>
+    <strong>{{ advisor_classes_count }}</strong>
+  </a>
 </div>
 
 <div class="dashboard-grid">
@@ -59,11 +63,12 @@
             <tbody>
               {% for course in courses %}
               <tr>
-                <td style="font-weight: 700;">{{ course.title }}</td>
+                <td style="font-weight: 700;"><a href="{{ url_for('teacher.course_overview', course_id=course.id) }}">{{ course.title }}</a></td>
                 <td><span class="status-pill status-{{ course.status }}">{{ course.status|replace('_', ' ')|title }}</span></td>
                 <td style="color: var(--text-muted);">{{ course.category.name if course.category else 'Chưa có' }}</td>
                 <td>
                   <div class="inline-actions">
+                    <a href="{{ url_for('teacher.course_overview', course_id=course.id) }}" class="btn btn-primary btn-sm">Lớp học</a>
                     <a href="{{ url_for('teacher.edit_course', course_id=course.id) }}" class="btn btn-outline btn-sm">Sửa</a>
                     <a href="{{ url_for('teacher.manage_lessons', course_id=course.id) }}" class="btn btn-outline btn-sm">Bài giảng</a>
                     <a href="{{ url_for('teacher.course_students', course_id=course.id) }}" class="btn btn-outline btn-sm">Học viên</a>
@@ -98,6 +103,11 @@
           <span class="task-type">Review</span>
           <strong>{{ pending_review_count }} khóa đang chờ duyệt</strong>
           <small>Theo dõi phản hồi từ học vụ.</small>
+        </a>
+        <a class="task-item" href="{{ url_for('teacher.advisor_dashboard') }}">
+          <span class="task-type">Advisor</span>
+          <strong>{{ advisor_classes_count }} lop co van</strong>
+          <small>Theo doi hoc vien, buoi hoc va diem danh.</small>
         </a>
       </div>
     </section>

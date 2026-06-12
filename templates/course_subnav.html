@@ -1,5 +1,8 @@
 <div class="course-nav-container">
   <div class="course-nav-tabs">
+    <a href="{{ url_for('teacher.course_overview', course_id=course.id) }}" class="course-nav-tab {% if request.endpoint in ['teacher.course_overview', 'teacher.class_detail', 'teacher.class_session_detail'] %}active{% endif %}">
+      Lớp học
+    </a>
     <a href="{{ url_for('teacher.manage_lessons', course_id=course.id) }}" class="course-nav-tab {% if request.endpoint in ['teacher.manage_lessons', 'teacher.edit_lesson'] %}active{% endif %}">
       📚 Bài học
     </a>

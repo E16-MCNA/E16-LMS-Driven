@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="top-header">
+  <div>
+    <a href="{{ url_for('teacher.advisor_dashboard') }}" class="btn btn-outline btn-sm" style="margin-bottom: 12px;">&larr; Co van hoc tap</a>
+    <h1>{{ course_class.name }}</h1>
+    <p>{{ course.title }} · Theo doi hoc vien va tinh hinh diem danh cua lop.</p>
+  </div>
+  <div class="actions">
+    <a href="{{ url_for('communication.class_forum', course_id=course.id, class_id=course_class.id) }}" class="btn btn-outline">Dien dan lop</a>
+    <span class="status-pill">{{ enrollments|length }} hoc vien</span>
+  </div>
+</header>
+
+<div class="grid-2">
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Hoc vien</h2>
+        <p>Tom tat diem danh theo tung hoc vien trong lop.</p>
+      </div>
+    </div>
+
+    {% if enrollments %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Co mat</th>
+              <th>Muon</th>
+              <th>Vang</th>
+              <th>Co phep</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for enrollment, student in enrollments %}
+              {% set summary = attendance_summary.get(student.id, {}) %}
+              <tr>
+                <td style="font-weight: 700;">{{ student.email }}</td>
+                <td>{{ summary.get("present", 0) }}</td>
+                <td>{{ summary.get("late", 0) }}</td>
+                <td>{{ summary.get("absent", 0) }}</td>
+                <td>{{ summary.get("excused", 0) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state compact">Lop nay chua co hoc vien.</div>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Buoi hoc gan day</h2>
+        <p>Lich su buoi hoc de co van nam tien do lop.</p>
+      </div>
+    </div>
+
+    {% if sessions %}
+      <div class="task-list">
+        {% for session in sessions %}
+          <div class="task-item">
+            <div>
+              <strong>{{ session.title }}</strong>
+              <small>{% if session.starts_at %}{{ session.starts_at.strftime('%d/%m/%Y %H:%M') }}{% else %}Chua xep lich{% endif %}</small>
+            </div>
+            <span class="status-pill">{{ session.status|title }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state compact">Lop nay chua co buoi hoc.</div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

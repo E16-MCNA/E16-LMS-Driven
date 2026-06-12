@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="top-header">
+  <div>
+    <a href="{{ url_for('hoc_vu.dashboard') }}" class="btn btn-outline btn-sm" style="margin-bottom: 12px;">&larr; Dashboard</a>
+    <h1>Xep lop hoc vien</h1>
+    <p>Hoc vien da dang ky mon nhung chua duoc dua vao lop se xuat hien tai day.</p>
+  </div>
+</header>
+
+<div class="grid-2">
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Dang cho xep lop</h2>
+        <p>{{ pending_enrollments|length }} hoc vien can xu ly.</p>
+      </div>
+    </div>
+
+    {% if pending_enrollments %}
+      <div class="task-list">
+        {% for enrollment, student, course in pending_enrollments %}
+          <div class="task-item wide">
+            <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap;">
+              <div>
+                <strong>{{ student.email }}</strong>
+                <small>{{ course.title }} · Dang ky {{ enrollment.enrolled_at.strftime('%d/%m/%Y %H:%M') }}</small>
+              </div>
+              <form action="{{ url_for('hoc_vu.assign_enrollment_class', enrollment_id=enrollment.id) }}" method="post" style="display: flex; gap: 8px; align-items: center;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <select name="class_id" required>
+                  <option value="">Chon lop</option>
+                  {% for cls in classes_by_course.get(course.id, []) %}
+                    <option value="{{ cls.id }}">{{ cls.name }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary btn-sm" {% if not classes_by_course.get(course.id) %}disabled{% endif %}>Xep lop</button>
+              </form>
+            </div>
+            {% if not classes_by_course.get(course.id) %}
+              <small style="color: var(--danger);">Khoa nay chua co lop. Tao lop o khung ben phai truoc.</small>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state compact">Khong co hoc vien nao dang cho xep lop.</div>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Tao lop nhanh</h2>
+        <p>Dung khi khoa hoc da co hoc vien nhung chua co lop de xep.</p>
+      </div>
+    </div>
+    <form action="{{ url_for('hoc_vu.create_course_class') }}" method="post" class="form-group">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label>Khoa hoc</label>
+        <select name="course_id" required>
+          <option value="">Chon khoa hoc</option>
+          {% for course in courses %}
+            <option value="{{ course.id }}">{{ course.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Ten lop</label>
+        <input type="text" name="name" placeholder="VD: Lop toi thu 3" required>
+      </div>
+      <div class="form-group">
+        <label>Co van hoc tap</label>
+        <select name="advisor_id">
+          <option value="">Dung giang vien phu trach khoa</option>
+          {% for teacher in teachers %}
+            <option value="{{ teacher.id }}">{{ teacher.email }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width: 100%;">Tao lop</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

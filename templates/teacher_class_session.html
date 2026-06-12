@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="top-header">
+  <div>
+    <a href="{{ url_for('teacher.class_detail', course_id=course.id, class_id=course_class.id) }}" class="btn btn-outline btn-sm" style="margin-bottom: 12px;">&larr; Quay lại {{ course_class.name }}</a>
+    <h1>{{ class_session.title }}</h1>
+    <p>{% if class_session.starts_at %}{{ class_session.starts_at.strftime('%d/%m/%Y %H:%M') }}{% else %}Chưa xếp lịch{% endif %} · {{ class_session.status|title }}</p>
+  </div>
+  <div class="actions">
+    <a href="{{ url_for('communication.class_forum', course_id=course.id, class_id=course_class.id) }}" class="btn btn-outline">Diễn đàn lớp</a>
+  </div>
+</header>
+
+{% include "course_subnav.html" %}
+
+<div class="grid-2">
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Bài học trong buổi</h2>
+        <p>Các bài học sẽ được dạy trong buổi này.</p>
+      </div>
+      <a href="{{ url_for('teacher.manage_lessons', course_id=course.id) }}" class="btn btn-outline btn-sm">Kho bài học</a>
+    </div>
+
+    <form action="{{ url_for('teacher.add_session_lesson', course_id=course.id, class_id=course_class.id, session_id=class_session.id) }}" method="post" class="form-group" style="margin-bottom: 20px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="lesson-id">Thêm bài học vào buổi</label>
+      <div style="display: flex; gap: 8px;">
+        <select id="lesson-id" name="lesson_id" required>
+          <option value="">Chọn bài học</option>
+          {% for lesson in available_lessons %}
+            <option value="{{ lesson.id }}">{{ lesson.sequence_order }}. {{ lesson.title }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary" {% if not available_lessons %}disabled{% endif %}>Thêm</button>
+      </div>
+    </form>
+
+    {% if lesson_links %}
+      <div class="task-list">
+        {% for link in lesson_links %}
+          <a class="task-item" href="{{ url_for('teacher.edit_lesson', course_id=course.id, lesson_id=link.lesson_id) }}">
+            <div>
+              <strong>{{ link.lesson.sequence_order }}. {{ link.lesson.title }}</strong>
+              <small>{{ link.lesson.video_url or link.lesson.document_url or 'Chưa có tài liệu' }}</small>
+            </div>
+            <span class="task-type">Bài học</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state compact">Buổi học này chưa gắn bài học nào.</div>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Quản lý điểm danh</h2>
+        <p>Danh sách học viên đang active trong khóa học.</p>
+      </div>
+    </div>
+
+    <form action="{{ url_for('teacher.update_attendance', course_id=course.id, class_id=course_class.id, session_id=class_session.id) }}" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if enrollments %}
+        <div style="overflow-x: auto;">
+          <table class="table" style="width: 100%; min-width: 720px;">
+            <thead>
+              <tr>
+                <th>Học viên</th>
+                <th>Trạng thái</th>
+                <th>Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for enrollment, student in enrollments %}
+                {% set record = attendance_map.get(student.id) %}
+                {% set current_status = record.status if record else 'absent' %}
+                <tr>
+                  <td>
+                    <strong>{{ student.email.split('@')[0] }}</strong>
+                    <div class="muted small">{{ student.email }}</div>
+                  </td>
+                  <td>
+                    <select name="attendance_{{ student.id }}">
+                      <option value="present" {% if current_status == 'present' %}selected{% endif %}>Có mặt</option>
+                      <option value="late" {% if current_status == 'late' %}selected{% endif %}>Đi muộn</option>
+                      <option value="absent" {% if current_status == 'absent' %}selected{% endif %}>Vắng</option>
+                      <option value="excused" {% if current_status == 'excused' %}selected{% endif %}>Có phép</option>
+                    </select>
+                  </td>
+                  <td>
+                    <input type="text" name="note_{{ student.id }}" value="{{ record.note if record else '' }}" placeholder="Ghi chú">
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top: 16px;">Lưu điểm danh</button>
+      {% else %}
+        <div class="empty-state compact">Khóa học chưa có học viên active.</div>
+      {% endif %}
+    </form>
+  </section>
+</div>
+{% endblock %}

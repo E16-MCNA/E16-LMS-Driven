@@ -33,7 +33,7 @@
             <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 400;">{{ s.email }}</div>
           </td>
           {% for q in quizzes %}
-            {% set score = scores[s.id]['quiz_' ~ q.id] %}
+            {% set score = scores[s.id].get('quiz_' ~ q.id) %}
             <td style="padding: 16px; text-align: center;">
               {% if score is not none %}
                 <span style="font-weight: 700; color: {% if score >= q.pass_score %}var(--success){% else %}var(--danger){% endif %};">
@@ -45,7 +45,7 @@
             </td>
           {% endfor %}
           {% for a in assignments %}
-            {% set score = scores[s.id]['assign_' ~ a.id] %}
+            {% set score = scores[s.id].get('assign_' ~ a.id) %}
             <td style="padding: 16px; text-align: center;">
               {% if score is not none %}
                 <span style="font-weight: 700; color: var(--primary);">{{ score }}</span>

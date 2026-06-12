@@ -144,6 +144,72 @@ class Lesson(db.Model):
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
 
 
+class CourseClass(db.Model):
+    __tablename__ = "course_classes"
+    __table_args__ = (
+        db.Index("idx_course_classes_course_status", "course_id", "status"),
+    )
+    id = db.Column(db.String(36), primary_key=True, default=new_uuid)
+    course_id = db.Column(db.String(36), db.ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
+    advisor_id = db.Column(db.String(36), db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    name = db.Column(db.String(255), nullable=False)
+    status = db.Column(db.String(20), default="active", nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+    course = db.relationship("Course", lazy="select", backref=db.backref("classes", cascade="all, delete-orphan"))
+    advisor = db.relationship("User", lazy="select", foreign_keys=[advisor_id])
+
+
+class ClassSession(db.Model):
+    __tablename__ = "class_sessions"
+    __table_args__ = (
+        db.Index("idx_class_sessions_class_start", "class_id", "starts_at"),
+    )
+    id = db.Column(db.String(36), primary_key=True, default=new_uuid)
+    class_id = db.Column(db.String(36), db.ForeignKey("course_classes.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = db.Column(db.String(255), nullable=False)
+    starts_at = db.Column(db.DateTime, nullable=True, index=True)
+    status = db.Column(db.String(20), default="scheduled", nullable=False, index=True)
+    notes = db.Column(db.Text, default="", nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+    course_class = db.relationship("CourseClass", lazy="select", backref=db.backref("sessions", cascade="all, delete-orphan"))
+
+
+class ClassSessionLesson(db.Model):
+    __tablename__ = "class_session_lessons"
+    __table_args__ = (
+        db.UniqueConstraint("session_id", "lesson_id", name="uq_class_session_lessons_session_lesson"),
+        db.Index("idx_class_session_lessons_session", "session_id"),
+    )
+    id = db.Column(db.String(36), primary_key=True, default=new_uuid)
+    session_id = db.Column(db.String(36), db.ForeignKey("class_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    lesson_id = db.Column(db.String(36), db.ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False, index=True)
+    sequence_order = db.Column(db.Integer, default=0, nullable=False)
+
+    session = db.relationship("ClassSession", lazy="select", backref=db.backref("lesson_links", cascade="all, delete-orphan"))
+    lesson = db.relationship("Lesson", lazy="select")
+
+
+class AttendanceRecord(db.Model):
+    __tablename__ = "attendance_records"
+    __table_args__ = (
+        db.UniqueConstraint("session_id", "user_id", name="uq_attendance_records_session_user"),
+        db.Index("idx_attendance_records_session_status", "session_id", "status"),
+    )
+    id = db.Column(db.String(36), primary_key=True, default=new_uuid)
+    session_id = db.Column(db.String(36), db.ForeignKey("class_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = db.Column(db.String(36), db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = db.Column(db.String(20), default="absent", nullable=False, index=True)
+    note = db.Column(db.Text, default="", nullable=False)
+    marked_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+    marked_by = db.Column(db.String(36), db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    session = db.relationship("ClassSession", lazy="select", backref=db.backref("attendance_records", cascade="all, delete-orphan"))
+    user = db.relationship("User", lazy="select", foreign_keys=[user_id])
+    marker = db.relationship("User", lazy="select", foreign_keys=[marked_by])
+
+
 class Enrollment(db.Model):
     __tablename__ = "enrollments"
     __table_args__ = (
@@ -154,6 +220,7 @@ class Enrollment(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=new_uuid)
     user_id = db.Column(db.String(36), db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     course_id = db.Column(db.String(36), db.ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
+    class_id = db.Column(db.String(36), db.ForeignKey("course_classes.id", ondelete="SET NULL"), nullable=True, index=True)
     enrolled_at = db.Column(db.DateTime, default=_utcnow, nullable=False, index=True)
     status = db.Column(db.String(20), default="active", nullable=False, index=True)  # active, dropped, completed
 
@@ -168,6 +235,7 @@ class Enrollment(db.Model):
 
     # ORM relationships for joinedload
     course = db.relationship("Course", lazy="select")
+    course_class = db.relationship("CourseClass", lazy="select")
     user = db.relationship("User", lazy="select", foreign_keys=[user_id])
 
 
@@ -230,6 +298,7 @@ class ForumThread(db.Model):
     __tablename__ = "forum_threads"
     id = db.Column(db.String(36), primary_key=True, default=new_uuid)
     course_id = db.Column(db.String(36), db.ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
+    class_id = db.Column(db.String(36), db.ForeignKey("course_classes.id", ondelete="CASCADE"), nullable=True, index=True)
     author_id = db.Column(db.String(36), db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     title = db.Column(db.String(255), nullable=False)
     body = db.Column(db.Text, nullable=False)

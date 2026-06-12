@@ -3,7 +3,23 @@ import pytest
 from datetime import timedelta
 from sqlalchemy.exc import IntegrityError
 from e16_app import create_app, db
-from e16_app.models import User, Course, Lesson, Enrollment, LearningLog, Quiz, Assignment, Question, Choice, Certificate, Submission
+from e16_app.models import (
+    AttendanceRecord,
+    ClassSession,
+    ClassSessionLesson,
+    Course,
+    CourseClass,
+    Enrollment,
+    LearningLog,
+    Lesson,
+    Quiz,
+    Assignment,
+    Question,
+    Choice,
+    Certificate,
+    Submission,
+    User,
+)
 from e16_app.time_utils import utcnow
 
 @pytest.fixture
@@ -35,6 +51,99 @@ def test_teacher_create_course(client, app, teacher_user):
         assert course is not None
         assert course.teacher_id == teacher_user
         assert course.status == "draft"
+
+
+def test_teacher_class_session_attendance_flow(client, app, teacher_user, student_user):
+    with app.app_context():
+        course = Course(title="Cohort Course", teacher_id=teacher_user, status="running")
+        db.session.add(course)
+        db.session.flush()
+        lesson = Lesson(course_id=course.id, title="Session Lesson", sequence_order=1)
+        db.session.add(lesson)
+        db.session.add(Enrollment(user_id=student_user, course_id=course.id, status="active"))
+        db.session.commit()
+        course_id = course.id
+        lesson_id = lesson.id
+
+    with client.session_transaction() as sess:
+        sess["_user_id"] = teacher_user
+        sess["_fresh"] = True
+
+    assert client.get(f"/teacher/courses/{course_id}").status_code == 200
+
+    response = client.post(
+        f"/teacher/courses/{course_id}/classes/new",
+        data={"name": "Cohort A"},
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        course_class = db.session.query(CourseClass).filter_by(course_id=course_id, name="Cohort A").first()
+        assert course_class is not None
+        assert course_class.advisor_id == teacher_user
+        class_id = course_class.id
+        enrollment = db.session.query(Enrollment).filter_by(user_id=student_user, course_id=course_id).first()
+        enrollment.class_id = class_id
+        db.session.commit()
+
+    response = client.post(
+        f"/teacher/courses/{course_id}/classes/{class_id}/sessions/new",
+        data={"title": "Buoi 1", "starts_at": "2026-06-12T19:00", "status": "scheduled"},
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        class_session = db.session.query(ClassSession).filter_by(class_id=class_id, title="Buoi 1").first()
+        assert class_session is not None
+        session_id = class_session.id
+
+    assert client.get(f"/teacher/courses/{course_id}/classes/{class_id}/sessions/{session_id}").status_code == 200
+
+    response = client.post(
+        f"/teacher/courses/{course_id}/classes/{class_id}/sessions/{session_id}/lessons/add",
+        data={"lesson_id": lesson_id},
+    )
+    assert response.status_code == 302
+
+    response = client.post(
+        f"/teacher/courses/{course_id}/classes/{class_id}/sessions/{session_id}/attendance",
+        data={f"attendance_{student_user}": "present", f"note_{student_user}": "On time"},
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        assert db.session.query(ClassSessionLesson).filter_by(session_id=session_id, lesson_id=lesson_id).count() == 1
+        attendance = db.session.query(AttendanceRecord).filter_by(session_id=session_id, user_id=student_user).first()
+        assert attendance is not None
+        assert attendance.status == "present"
+        assert attendance.note == "On time"
+
+    assert client.get("/teacher/advisor").status_code == 200
+    assert client.get(f"/teacher/advisor/classes/{class_id}").status_code == 200
+
+
+def test_teacher_advisor_can_view_assigned_class_without_owning_course(client, app, student_user):
+    with app.app_context():
+        owner = User(email="course_owner@e16.edu.vn", password_hash="hash", role="teacher")
+        advisor = User(email="class_advisor@e16.edu.vn", password_hash="hash", role="teacher")
+        db.session.add_all([owner, advisor])
+        db.session.flush()
+        course = Course(title="Advisor Course", teacher_id=owner.id, status="running")
+        db.session.add(course)
+        db.session.flush()
+        course_class = CourseClass(course_id=course.id, advisor_id=advisor.id, name="Advisor Class")
+        db.session.add(course_class)
+        db.session.add(Enrollment(user_id=student_user, course_id=course.id, class_id=course_class.id, status="active"))
+        db.session.commit()
+        advisor_id = advisor.id
+        class_id = course_class.id
+
+    with client.session_transaction() as sess:
+        sess["_user_id"] = advisor_id
+        sess["_fresh"] = True
+
+    assert client.get("/teacher/advisor").status_code == 200
+    assert client.get(f"/teacher/advisor/classes/{class_id}").status_code == 200
 
 def test_student_enrollment(client, app, student_user, teacher_user):
     with app.app_context():

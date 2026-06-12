@@ -36,7 +36,10 @@
           </td>
           <td style="padding: 16px;">
             {% if log.target_type %}
-              {{ log.target_type }} <code style="font-size: 0.7rem;">{{ log.target_id[:8] }}...</code>
+              {{ log.target_type }}
+              {% if log.target_id %}
+                <code style="font-size: 0.7rem;">{{ log.target_id[:8] }}...</code>
+              {% endif %}
             {% else %}
               —
             {% endif %}

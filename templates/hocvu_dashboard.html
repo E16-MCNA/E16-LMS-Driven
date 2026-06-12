@@ -8,6 +8,7 @@
   </div>
   <div class="actions">
     <a href="{{ url_for('hoc_vu.pending_courses') }}" class="btn btn-primary">Duyệt khóa học</a>
+    <a href="{{ url_for('hoc_vu.class_placement') }}" class="btn btn-outline">Xếp lớp</a>
     <a href="{{ url_for('analytics.dashboard') }}" class="btn btn-outline">Báo cáo</a>
   </div>
 </header>
@@ -69,6 +70,10 @@
         <a href="{{ url_for('hoc_vu.pending_courses') }}" class="quick-action">
           <strong>Duyệt khóa</strong>
           <small>Xem khóa đang chờ học vụ xử lý</small>
+        </a>
+        <a href="{{ url_for('hoc_vu.class_placement') }}" class="quick-action">
+          <strong>Xếp lớp</strong>
+          <small>Đưa học viên đã đăng ký vào lớp học cụ thể</small>
         </a>
         <a href="{{ url_for('analytics.dashboard') }}" class="quick-action">
           <strong>Xem analytics</strong>
